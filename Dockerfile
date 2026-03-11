@@ -6,11 +6,12 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Build stella-meet Go binary
 # ---------------------------------------------------------------------------
-FROM golang:1.22-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
+ARG TARGETARCH
 
 WORKDIR /build
 COPY src/stella-meet/ .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /stella-meet .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o /stella-meet .
 
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime
@@ -19,26 +20,33 @@ FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Google Chrome APT repo
+# Install Chrome (amd64) or Chromium (arm64) + runtime dependencies
+ARG TARGETARCH
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg \
-    && curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub \
-       | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
-       http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google-chrome.list
-
-# Install all runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        google-chrome-stable \
+    && if [ "$TARGETARCH" = "amd64" ]; then \
+        curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub \
+          | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+        && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] \
+           http://dl.google.com/linux/chrome/deb/ stable main" \
+           > /etc/apt/sources.list.d/google-chrome.list \
+        && apt-get update \
+        && apt-get install -y --no-install-recommends google-chrome-stable ; \
+       else \
+        apt-get install -y --no-install-recommends chromium ; \
+       fi \
+    && apt-get install -y --no-install-recommends \
         pipewire pipewire-pulse pipewire-alsa \
-        ffmpeg \
-        pulseaudio-utils \
+        ffmpeg pulseaudio-utils \
         python3 python3-websockets \
-        xvfb \
-        dbus-x11 \
-        procps \
+        xvfb dbus-x11 procps \
     && rm -rf /var/lib/apt/lists/*
+
+# Symlink chromium → google-chrome for start-chrome.sh compatibility
+RUN if [ ! -f /usr/bin/google-chrome ] && [ -f /usr/bin/chromium ]; then \
+        ln -s /usr/bin/chromium /usr/bin/google-chrome ; \
+    fi
 
 WORKDIR /app
 

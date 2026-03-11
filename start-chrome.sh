@@ -13,14 +13,20 @@ LOG_DIR="/app/data/logs"
 # ---- Create data directories ------------------------------------------------
 mkdir -p /app/data/{logs,credentials,chrome-profile}
 
-# ---- Redirect stella-meet logs -----------------------------------------------
-# stella-meet writes logs to $HOME/.openclaw/workspace/stella-meet-go/logs/
-# Symlink so they end up in /app/data/logs/
-mkdir -p "$HOME/.openclaw/workspace/stella-meet-go"
-ln -sfn "$LOG_DIR" "$HOME/.openclaw/workspace/stella-meet-go/logs"
+# ---- Tell stella-meet to log directly to the volume -------------------------
+export STELLA_LOG_DIR="$LOG_DIR"
+
+# ---- Set XDG_RUNTIME_DIR (required by PipeWire) ----------------------------
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+
+# ---- Clean stale PID files from previous container runs --------------------
+rm -f /tmp/stella-*.pid
 
 # ---- Start Xvfb (virtual framebuffer) ---------------------------------------
 echo "Starting Xvfb..."
+rm -f /tmp/.X99-lock
 Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &
 export DISPLAY=:99
 sleep 2
