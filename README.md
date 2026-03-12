@@ -34,6 +34,8 @@ The daemon starts with a 1-minute heartbeat. If an app password is configured, i
 | `GOOGLE_APP_PASSWORD` | No | — | Google app password (enables calendar + email) |
 | `GOOGLE_CALENDAR_ID` | No | `primary` | Google Calendar ID to monitor |
 | `STELLA_EMAIL_SENDERS` | No | otter, fireflies, google | Comma-separated notetaker email senders to watch |
+| `AGENT_OWNER_NAME` | No | — | Owner name (used in notification emails) |
+| `AGENT_OWNER_EMAIL` | No | — | Owner email (enables new-meeting notifications) |
 | `STELLA_RAG_URL` | No | `http://localhost:8000` | stella-rag server URL |
 | `STELLA_RAG_KEY` | No | — | stella-rag API key |
 | `STELLA_CALENDAR_INTERVAL` | No | `5` | Calendar scan interval in minutes |
