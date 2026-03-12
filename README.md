@@ -22,7 +22,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The daemon starts with a 1-minute heartbeat. If an app password is configured, it scans for upcoming meetings every 5 minutes and checks for transcription emails every 10 minutes.
+The daemon starts with a 1-minute heartbeat. If an app password is configured, it scans for upcoming meetings every 5 minutes (configurable via `STELLA_CALENDAR_INTERVAL`) and checks for transcription emails every 10 minutes (configurable via `STELLA_EMAIL_INTERVAL`).
 
 ## Environment Variables
 
@@ -36,6 +36,8 @@ The daemon starts with a 1-minute heartbeat. If an app password is configured, i
 | `STELLA_EMAIL_SENDERS` | No | otter, fireflies, google | Comma-separated notetaker email senders to watch |
 | `STELLA_RAG_URL` | No | `http://localhost:8000` | stella-rag server URL |
 | `STELLA_RAG_KEY` | No | — | stella-rag API key |
+| `STELLA_CALENDAR_INTERVAL` | No | `5` | Calendar scan interval in minutes |
+| `STELLA_EMAIL_INTERVAL` | No | `10` | Email scan interval in minutes |
 | `STELLA_DEFAULT_VOICE` | No | `coral` | OpenAI voice (alloy, ash, ballad, coral, echo, sage, shimmer, verse) |
 | `STELLA_DEFAULT_LANG` | No | `español` | Response language |
 | `CHROME_DEBUG_ADDR` | No | `http://127.0.0.1:18800` | Chrome CDP address (internal) |
