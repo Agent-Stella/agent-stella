@@ -1,21 +1,8 @@
 # =============================================================================
 # agent-stella — Docker image for Stella AI meeting agent
-# Multi-stage build: Go binary + runtime with Chrome, PipeWire, ffmpeg
+# Pre-built binary + runtime with Chrome, PipeWire, ffmpeg
 # =============================================================================
 
-# ---------------------------------------------------------------------------
-# Stage 1: Build stella-meet Go binary
-# ---------------------------------------------------------------------------
-FROM golang:1.25-bookworm AS builder
-ARG TARGETARCH
-
-WORKDIR /build
-COPY src/stella-meet/ .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o /stella-meet .
-
-# ---------------------------------------------------------------------------
-# Stage 2: Runtime
-# ---------------------------------------------------------------------------
 FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -50,11 +37,11 @@ RUN if [ ! -f /usr/bin/google-chrome ] && [ -f /usr/bin/chromium ]; then \
 
 WORKDIR /app
 
-# Copy binary from build stage
-COPY --from=builder /stella-meet /app/stella-meet
+# Copy pre-built binary (build with src/stella-meet/build.sh first)
+COPY bin/stella-meet /app/stella-meet
 
 # Copy entrypoint script
-COPY agent-stella/start-chrome.sh /app/start-chrome.sh
+COPY start-chrome.sh /app/start-chrome.sh
 RUN chmod +x /app/start-chrome.sh
 
 EXPOSE 18800

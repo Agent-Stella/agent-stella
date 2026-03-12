@@ -1,8 +1,7 @@
 services:
   stella:
     build:
-      context: ..
-      dockerfile: agent-stella/Dockerfile
+      context: .
     container_name: agent-stella
     restart: unless-stopped
     env_file:
