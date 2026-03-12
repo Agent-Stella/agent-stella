@@ -169,4 +169,4 @@ fi
 echo "Chrome ready for stella-meet"
 
 # ---- Start stella-meet daemon ------------------------------------------------
-exec /app/stella-meet daemon
+exec /usr/local/bin/stella-meet daemon
