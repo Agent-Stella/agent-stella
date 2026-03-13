@@ -24,16 +24,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         apt-get install -y --no-install-recommends chromium ; \
        fi \
     && apt-get install -y --no-install-recommends \
-        pipewire pipewire-pulse pipewire-alsa \
+        pipewire pipewire-pulse pipewire-alsa wireplumber \
         ffmpeg pulseaudio-utils \
         python3 python3-websockets \
-        xvfb dbus-x11 procps \
+        xvfb dbus-x11 dbus-user-session procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Symlink chromium → google-chrome for start-chrome.sh compatibility
 RUN if [ ! -f /usr/bin/google-chrome ] && [ -f /usr/bin/chromium ]; then \
         ln -s /usr/bin/chromium /usr/bin/google-chrome ; \
     fi
+
+# Persist env vars so `docker compose exec` sessions can reach
+# Xvfb, PipeWire, and D-Bus started by the entrypoint.
+ENV DISPLAY=:99
+ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
 WORKDIR /app
 

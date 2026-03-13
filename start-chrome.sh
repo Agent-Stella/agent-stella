@@ -44,23 +44,34 @@ if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     export DBUS_SESSION_BUS_ADDRESS
 fi
 
-# ---- Start PipeWire ----------------------------------------------------------
+# ---- Start D-Bus system daemon (required by PipeWire/WirePlumber) -----------
+mkdir -p /run/dbus
+dbus-daemon --system --fork 2>/dev/null || true
+
+# ---- Start PipeWire + WirePlumber -------------------------------------------
 echo "Starting PipeWire..."
 pipewire &
+sleep 1
+wireplumber &
 sleep 1
 pipewire-pulse &
 sleep 2
 
 # Create virtual sinks for audio routing
-pw-cli create-node adapter '{ factory.name=support.null-audio-sink
-    node.name=meet_to_igor media.class=Audio/Sink
-    audio.position=[FL FR] monitor.channel-volumes=true }' 2>/dev/null || true
+pactl load-module module-null-sink sink_name=meet_to_stella sink_properties=device.description=meet_to_stella || true
+pactl load-module module-null-sink sink_name=stella_to_meet sink_properties=device.description=stella_to_meet || true
 
-pw-cli create-node adapter '{ factory.name=support.null-audio-sink
-    node.name=igor_to_meet media.class=Audio/Sink
-    audio.position=[FL FR] monitor.channel-volumes=true }' 2>/dev/null || true
+# Create a proper source from stella_to_meet's monitor so Chrome sees it as a microphone
+# (Chrome won't use .monitor sources directly — needs a real named source)
+pactl load-module module-remap-source source_name=stella_mic master=stella_to_meet.monitor source_properties=device.description=stella_mic || true
 
-echo "PipeWire running with virtual sinks"
+# Set defaults:
+#   sink = meet_to_stella (Chrome audio output → captured by stella)
+#   source = stella_mic (stella audio output → Chrome mic input)
+pactl set-default-sink meet_to_stella
+pactl set-default-source stella_mic
+
+echo "PipeWire + WirePlumber running with virtual sinks"
 
 # ---- Kill stale Chrome -------------------------------------------------------
 pkill -f "google-chrome.*$PORT" 2>/dev/null || true
@@ -78,6 +89,8 @@ nohup google-chrome \
     --no-sandbox \
     --disable-dev-shm-usage \
     --disable-setuid-sandbox \
+    --use-fake-ui-for-media-stream \
+    --autoplay-policy=no-user-gesture-required \
     about:blank > "$LOG_DIR/chrome.log" 2>&1 &
 
 CHROME_PID=$!
