@@ -50,11 +50,11 @@ dbus-daemon --system --fork 2>/dev/null || true
 
 # ---- Start PipeWire + WirePlumber -------------------------------------------
 echo "Starting PipeWire..."
-pipewire &
+pipewire > "$LOG_DIR/pipewire.log" 2>&1 &
 sleep 1
-wireplumber &
+wireplumber > "$LOG_DIR/wireplumber.log" 2>&1 &
 sleep 1
-pipewire-pulse &
+pipewire-pulse > "$LOG_DIR/pipewire-pulse.log" 2>&1 &
 sleep 2
 
 # Create virtual sinks for audio routing
@@ -108,69 +108,212 @@ echo "Chrome OK on port $PORT"
 # ---- Auto-login to Google account -------------------------------------------
 if [ -n "$GOOGLE_EMAIL" ] && [ -n "$GOOGLE_PASSWORD" ]; then
     echo "Attempting Google auto-login..."
-    python3 << PYEOF
-import json, asyncio, websockets, urllib.request
+    python3 << 'PYEOF'
+import json, asyncio, websockets, urllib.request, hmac, hashlib, struct, base64, time as _time, os
+
+def totp_code(secret_b32):
+    """Generate a 6-digit TOTP code from a base32 secret (no external deps)."""
+    key = base64.b32decode(secret_b32.upper().replace(' ', ''), casefold=True)
+    counter = struct.pack('>Q', int(_time.time()) // 30)
+    mac = hmac.new(key, counter, hashlib.sha1).digest()
+    offset = mac[-1] & 0x0F
+    code = struct.unpack('>I', mac[offset:offset+4])[0] & 0x7FFFFFFF
+    return str(code % 1000000).zfill(6)
+
+EMAIL = os.environ.get('GOOGLE_EMAIL', '')
+PWD = os.environ.get('GOOGLE_PASSWORD', '')
+TOTP_SECRET = os.environ.get('GOOGLE_TOTP_SECRET', '')
+CDP_PORT = os.environ.get('PORT', '18800')
+
+async def cdp_eval(ws, expr, msg_id=99):
+    """Evaluate JS via CDP and return the string result."""
+    await ws.send(json.dumps({'id': msg_id, 'method': 'Runtime.evaluate', 'params': {'expression': expr}}))
+    r = json.loads(await ws.recv())
+    return r.get('result', {}).get('result', {}).get('value', '')
+
+async def cdp_nav(ws, url, msg_id=99):
+    """Navigate to a URL via CDP."""
+    await ws.send(json.dumps({'id': msg_id, 'method': 'Page.navigate', 'params': {'url': url}}))
+    await ws.recv()
+
+async def get_url(ws):
+    return await cdp_eval(ws, 'window.location.href')
+
+async def click_button(ws, pattern):
+    """Click the first button whose text matches the regex pattern."""
+    return await cdp_eval(ws, f"""
+(function(){{
+    var b = Array.from(document.querySelectorAll('button, [role=button]'));
+    var m = b.find(function(x){{ return {pattern}.test(x.innerText); }});
+    if(m){{ m.click(); return 'ok'; }}
+    return 'not_found';
+}})()""")
+
+async def fill_input(ws, selector, value):
+    """Fill an input field and dispatch input event."""
+    return await cdp_eval(ws, f"""
+(function(){{
+    var inp = document.querySelector('{selector}');
+    if(inp){{
+        inp.focus();
+        inp.value = '{value}';
+        inp.dispatchEvent(new Event('input', {{bubbles:true}}));
+        inp.dispatchEvent(new Event('change', {{bubbles:true}}));
+        return 'ok';
+    }}
+    return 'not_found';
+}})()""")
 
 async def login():
-    tabs = json.loads(urllib.request.urlopen('http://127.0.0.1:$PORT/json').read())
+    tabs = json.loads(urllib.request.urlopen(f'http://127.0.0.1:{CDP_PORT}/json').read())
     tab = next(t for t in tabs if t.get('type') == 'page')
 
     async with websockets.connect(tab['webSocketDebuggerUrl']) as ws:
-        # Navigate to Google Meet to check session
-        await ws.send(json.dumps({'id':1,'method':'Page.navigate','params':{'url':'https://meet.google.com'}}))
-        await ws.recv()
+        # 1. Check if already logged in
+        await cdp_nav(ws, 'https://meet.google.com')
         await asyncio.sleep(4)
+        url = await get_url(ws)
+        print(f'Initial URL: {url}')
 
-        await ws.send(json.dumps({'id':2,'method':'Runtime.evaluate','params':{'expression':'window.location.href'}}))
-        r = json.loads(await ws.recv())
-        url = r['result']['result'].get('value','')
-        print('URL:', url)
+        if 'meet.google.com' in url and 'workspace.google.com' not in url and 'accounts.google.com' not in url:
+            print('Already logged in')
+            return
 
-        if 'accounts.google.com' in url or 'signin' in url:
-            print('Login required, proceeding...')
-            email = '$GOOGLE_EMAIL'
-            pwd = '$GOOGLE_PASSWORD'
+        print('Login required, proceeding...')
 
-            # Enter email
-            await ws.send(json.dumps({'id':3,'method':'Runtime.evaluate','params':{'expression':f"""
+        # 2. Navigate to sign-in page
+        await cdp_nav(ws, 'https://accounts.google.com/ServiceLogin?continue=https://meet.google.com')
+        await asyncio.sleep(4)
+        url = await get_url(ws)
+        print(f'Sign-in page: {url}')
+
+        # 3. Handle account chooser — click the target account or "Use another account"
+        if 'accountchooser' in url or 'signinchooser' in url:
+            print('Account chooser detected')
+            # Try clicking on the target email if listed
+            result = await cdp_eval(ws, f"""
 (function(){{
-    var inp = document.querySelector('input[type=email]');
-    if(inp){{ inp.value='{email}'; inp.dispatchEvent(new Event('input',{{bubbles:true}})); return 'ok'; }}
-    return 'no email field';
-}})()
-"""}}))
-            r = json.loads(await ws.recv())
-            print('email:', r['result']['result'].get('value',''))
-            await asyncio.sleep(1)
+    // Look for the account tile containing our email
+    var items = document.querySelectorAll('[data-email]');
+    for(var i=0; i<items.length; i++){{
+        if(items[i].getAttribute('data-email').toLowerCase() === '{EMAIL}'.toLowerCase()){{
+            items[i].click();
+            return 'selected:' + items[i].getAttribute('data-email');
+        }}
+    }}
+    // Also try matching by text content
+    var divs = document.querySelectorAll('[data-identifier]');
+    for(var i=0; i<divs.length; i++){{
+        if(divs[i].getAttribute('data-identifier').toLowerCase() === '{EMAIL}'.toLowerCase()){{
+            divs[i].click();
+            return 'selected:' + divs[i].getAttribute('data-identifier');
+        }}
+    }}
+    // Try clicking any element that contains the email text
+    var all = document.querySelectorAll('li, div[role=link], div[tabindex]');
+    for(var i=0; i<all.length; i++){{
+        if(all[i].textContent.includes('{EMAIL}')){{
+            all[i].click();
+            return 'selected_by_text';
+        }}
+    }}
+    return 'not_found';
+}})()""")
+            print(f'Account selection: {result}')
 
-            # Click Next
-            await ws.send(json.dumps({'id':4,'method':'Runtime.evaluate','params':{'expression':"""
-(function(){var b=Array.from(document.querySelectorAll('button'));var n=b.find(x=>/next|siguiente/i.test(x.innerText));if(n){n.click();return 'ok';}return 'no next button';})()
-"""}}))
-            await ws.recv()
+            if result == 'not_found':
+                # Click "Use another account" / "Usar otra cuenta"
+                r = await click_button(ws, r'/use another|usar otra|add.*account|añadir/i')
+                print(f'Use another account: {r}')
+                await asyncio.sleep(3)
+                # Now fill email
+                r = await fill_input(ws, 'input[type=email]', EMAIL)
+                print(f'Email fill: {r}')
+                await asyncio.sleep(1)
+                r = await click_button(ws, r'/next|siguiente/i')
+                print(f'Email next: {r}')
+                await asyncio.sleep(3)
+            else:
+                # Account was selected, should go to password page
+                await asyncio.sleep(3)
+
+        else:
+            # 4. Standard email entry (no account chooser)
+            r = await fill_input(ws, 'input[type=email]', EMAIL)
+            print(f'Email fill: {r}')
+            await asyncio.sleep(1)
+            r = await click_button(ws, r'/next|siguiente/i')
+            print(f'Email next: {r}')
             await asyncio.sleep(3)
 
-            # Enter password
-            await ws.send(json.dumps({'id':5,'method':'Runtime.evaluate','params':{'expression':f"""
-(function(){{
-    var inp = document.querySelector('input[type=password]');
-    if(inp){{ inp.value='{pwd}'; inp.dispatchEvent(new Event('input',{{bubbles:true}})); return 'ok'; }}
-    return 'no password field';
-}})()
-"""}}))
-            r = json.loads(await ws.recv())
-            print('pwd:', r['result']['result'].get('value',''))
-            await asyncio.sleep(1)
+        # 5. Password page
+        url = await get_url(ws)
+        print(f'Password page: {url}')
+        r = await fill_input(ws, 'input[type=password]', PWD)
+        print(f'Password fill: {r}')
+        if r == 'not_found':
+            # Password field might be name="Passwd" on some flows
+            r = await fill_input(ws, 'input[name=Passwd]', PWD)
+            print(f'Password fill (Passwd): {r}')
+        await asyncio.sleep(1)
+        r = await click_button(ws, r'/next|siguiente|sign.in|iniciar/i')
+        print(f'Password submit: {r}')
+        await asyncio.sleep(5)
 
-            # Click Sign In
-            await ws.send(json.dumps({'id':6,'method':'Runtime.evaluate','params':{'expression':"""
-(function(){var b=Array.from(document.querySelectorAll('button'));var n=b.find(x=>/next|siguiente|sign in/i.test(x.innerText));if(n){n.click();return 'ok';}return 'no sign-in button';})()
-"""}}))
-            await ws.recv()
-            await asyncio.sleep(5)
-            print('Login submitted')
+        # 6. TOTP / MFA challenge
+        if TOTP_SECRET:
+            url = await get_url(ws)
+            print(f'Post-password URL: {url}')
+
+            if 'challenge' in url or 'signin' in url:
+                # Google might show an MFA method chooser. Try to select TOTP.
+                # Look for "Google Authenticator" / "authentication app" option
+                r = await cdp_eval(ws, """
+(function(){
+    var items = document.querySelectorAll('[data-challengetype], [data-sendmethod]');
+    for(var i=0; i<items.length; i++){
+        var t = items[i].textContent.toLowerCase();
+        if(t.includes('authenticator') || t.includes('autenticador') || t.includes('verification code') || t.includes('código de verificación')){
+            items[i].click();
+            return 'selected_totp';
+        }
+    }
+    // Check if we're already on the TOTP input page
+    var inp = document.querySelector('input#totpPin, input[name=totpPin], input[type=tel]');
+    if(inp) return 'already_on_totp';
+    return 'no_totp_option';
+})()""")
+                print(f'MFA method: {r}')
+
+                if r == 'selected_totp':
+                    await asyncio.sleep(3)
+
+                code = totp_code(TOTP_SECRET)
+                print(f'Entering TOTP code: {code[:2]}****')
+
+                r = await fill_input(ws, 'input#totpPin', code)
+                if r == 'not_found':
+                    r = await fill_input(ws, 'input[name=totpPin]', code)
+                if r == 'not_found':
+                    r = await fill_input(ws, 'input[type=tel]', code)
+                print(f'TOTP fill: {r}')
+                await asyncio.sleep(1)
+
+                r = await click_button(ws, r'/next|siguiente|verify|verificar/i')
+                print(f'TOTP submit: {r}')
+                await asyncio.sleep(5)
+            else:
+                print('No MFA challenge detected')
+
+        # 7. Verify login
+        await cdp_nav(ws, 'https://meet.google.com')
+        await asyncio.sleep(4)
+        url = await get_url(ws)
+        print(f'Post-login URL: {url}')
+        if 'meet.google.com' in url and 'workspace.google.com' not in url:
+            print('Login verified OK')
         else:
-            print('Already logged in')
+            print('WARNING: login may have failed — Chrome may not be authenticated')
 
 asyncio.run(login())
 PYEOF
