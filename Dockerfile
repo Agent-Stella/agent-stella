@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         pipewire pipewire-pulse pipewire-alsa wireplumber \
         ffmpeg pulseaudio-utils \
         python3 python3-websockets \
-        xvfb dbus-x11 dbus-user-session procps \
+        xvfb x11-utils dbus-x11 dbus-user-session procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Symlink chromium → google-chrome for start-chrome.sh compatibility

@@ -27,7 +27,7 @@ rm -f /tmp/stella-*.pid
 # ---- Start Xvfb (virtual framebuffer) ---------------------------------------
 echo "Starting Xvfb..."
 rm -f /tmp/.X99-lock
-Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &
+Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$LOG_DIR/xvfb.log" 2>&1 &
 export DISPLAY=:99
 sleep 2
 
