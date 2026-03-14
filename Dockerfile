@@ -43,7 +43,7 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 WORKDIR /app
 
 # Copy pre-built binary (build with src/stella-meet/build.sh first)
-COPY bin/stella-meet /usr/local/bin/stella-meet
+COPY bin/agent-stella /usr/local/bin/agent-stella
 
 # Copy entrypoint script
 COPY start-chrome.sh /app/start-chrome.sh

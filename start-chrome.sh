@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # agent-stella container entrypoint
-# Starts Xvfb, PipeWire, Chrome (with auto-login), then stella-meet daemon
+# Starts Xvfb, PipeWire, Chrome (with auto-login), then agent-stella daemon
 # =============================================================================
 
 set -e
@@ -13,7 +13,7 @@ LOG_DIR="/app/data/logs"
 # ---- Create data directories ------------------------------------------------
 mkdir -p /app/data/{logs,credentials,chrome-profile}
 
-# ---- Tell stella-meet to log directly to the volume -------------------------
+# ---- Tell agent-stella to log directly to the volume -------------------------
 export STELLA_LOG_DIR="$LOG_DIR"
 
 # ---- Set XDG_RUNTIME_DIR (required by PipeWire) ----------------------------
@@ -322,7 +322,7 @@ else
     echo "GOOGLE_EMAIL/GOOGLE_PASSWORD not set, skipping auto-login"
 fi
 
-echo "Chrome ready for stella-meet"
+echo "Chrome ready for agent-stella"
 
-# ---- Start stella-meet daemon ------------------------------------------------
-exec /usr/local/bin/stella-meet daemon
+# ---- Start agent-stella daemon ------------------------------------------------
+exec /usr/local/bin/agent-stella daemon
