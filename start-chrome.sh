@@ -6,6 +6,13 @@
 
 set -e
 
+# ---- Fast path for CLI commands (no Chrome/PipeWire needed) -----------------
+# If arguments are passed (docker compose run stella stella rag init --write),
+# skip the full startup and just exec the command directly.
+if [ $# -gt 0 ]; then
+    exec "$@"
+fi
+
 PROFILE="/app/data/chrome-profile"
 PORT=18800
 LOG_DIR="/app/data/logs"
