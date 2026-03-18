@@ -1,0 +1,97 @@
+# ─────────────────────────────────────────────────────────────
+# Stella Configuration
+# ─────────────────────────────────────────────────────────────
+# All values can be overridden by environment variables.
+# The mapping is shown in comments next to each field.
+#
+# Config file search order:
+#   1. $STELLA_CONFIG (path to file)
+#   2. ./stella-data/config/stella.toml
+#   3. ./stella.toml
+
+# ── Core credentials ──────────────────────────────────────────
+
+[basic]
+# openai_api_key = "sk-..."        # env: OPENAI_API_KEY (required)
+# google_email = "stella@example.com"  # env: GOOGLE_EMAIL
+# google_password = ""              # env: GOOGLE_PASSWORD (Chrome auto-login)
+# totp_secret = ""                  # env: GOOGLE_TOTP_SECRET (2FA authenticator secret)
+# app_password = ""                 # env: GOOGLE_APP_PASSWORD (Gmail IMAP app password)
+
+# ── Agent identity & behavior ─────────────────────────────────
+
+[agent]
+name = "Stella"                     # env: STELLA_AGENT_NAME
+default_voice = "coral"             # env: STELLA_DEFAULT_VOICE
+                                    #   Options: alloy, ash, ballad, coral, echo, sage, shimmer, verse
+default_lang = "English"             # env: STELLA_DEFAULT_LANG
+listen_only = false                 # env: STELLA_LISTEN_ONLY
+                                    #   When true, only responds when addressed by name
+enable_notes = true                 # env: STELLA_ENABLE_NOTES
+                                    #   Activate Gemini notes/transcription when joining
+auto_accept_guests = true           # env: STELLA_AUTO_ACCEPT_GUESTS
+                                    #   Auto-admit waiting guests (when agent is host)
+
+# ── Logging ───────────────────────────────────────────────────
+
+[logs]
+# dir = "stella-data/logs"          # env: STELLA_LOG_DIR
+rotate_time = "00:00"               # Daily rotation time (HH:MM, 24h format)
+retention_days = 30                  # Delete rotated logs older than N days
+
+# ── Chrome / CDP ──────────────────────────────────────────────
+
+[chrome]
+debug_addr = "http://127.0.0.1:18800"  # env: CHROME_DEBUG_ADDR
+
+# ── Calendar integration ──────────────────────────────────────
+# Requires: basic.google_email + calendar.credentials_file
+
+[calendar]
+enabled = false                      # Auto-detected from credentials
+# credentials_file = "stella-data/credentials/service-account.json"  # env: GOOGLE_CREDENTIALS_FILE
+calendar_id = "primary"              # env: GOOGLE_CALENDAR_ID
+scan_interval = 5                    # env: STELLA_CALENDAR_INTERVAL (minutes)
+
+# ── Email scanning ────────────────────────────────────────────
+# Requires: basic.google_email + basic.app_password
+
+[email]
+enabled = false                      # Auto-detected from credentials
+scan_interval = 10                   # env: STELLA_EMAIL_INTERVAL (minutes)
+keywords = ["notes", "transcript", "meeting", "summary", "recording"]
+                                     # env: STELLA_EMAIL_KEYWORDS (comma-separated)
+# senders = ["notifications@otter.ai", "notifications@fireflies.ai", "meet-recordings-noreply@google.com"]
+                                     # env: STELLA_EMAIL_SENDERS (comma-separated)
+
+# ── Owner notifications ───────────────────────────────────────
+
+[owner]
+# name = "Your Name"                # env: AGENT_OWNER_NAME
+# email = "you@example.com"         # env: AGENT_OWNER_EMAIL
+                                     #   If set, enables email notifications about new meetings
+
+# ── RAG (knowledge base) ─────────────────────────────────────
+
+[rag]
+enabled = false                      # Auto-detected from URL or database config
+url = "http://localhost:8080"        # env: STELLA_RAG_URL
+# api_key = ""                       # env: STELLA_RAG_KEY
+
+# ── RAG database (for local mode: stella rag serve) ──────────
+
+[rag.database]
+host = "localhost"                   # env: STELLA_DB_HOST
+port = 5432                          # env: STELLA_DB_PORT
+name = "stella"                      # env: STELLA_DB_NAME
+user = "stella"                      # env: STELLA_DB_USER
+# password = ""                      # env: STELLA_DB_PASSWORD
+sslmode = "disable"                  # env: STELLA_DB_SSLMODE
+
+# ── RAG backup ────────────────────────────────────────────────
+
+[rag.backup]
+mode = "off"                         # "off", "daily", "weekly", "monthly", "auto"
+time = "03:00"                       # Backup time (HH:MM, 24h format)
+retention = 7                        # Keep N most recent backups
+dir = "stella-data/backup"           # Backup directory

@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# agent-stella container entrypoint
-# Starts Xvfb, PipeWire, Chrome (with auto-login), then agent-stella daemon
+# stella container entrypoint
+# Starts Xvfb, PipeWire, Chrome (with auto-login), then stella daemon
 # =============================================================================
 
 set -e
@@ -10,10 +10,17 @@ PROFILE="/app/data/chrome-profile"
 PORT=18800
 LOG_DIR="/app/data/logs"
 
-# ---- Create data directories ------------------------------------------------
-mkdir -p /app/data/{logs,credentials,chrome-profile}
+# ---- Detect build environment -----------------------------------------------
+BUILD_ENV="$(stella build-env 2>/dev/null || echo devel)"
 
-# ---- Tell agent-stella to log directly to the volume -------------------------
+# ---- Export config values as env vars (for Python login script) -------------
+eval "$(stella export-env 2>/dev/null)"
+
+# ---- Create data directories ------------------------------------------------
+mkdir -p /app/data/{logs,credentials,chrome-profile,config,cache,backup}
+
+
+# ---- Tell stella to log directly to the volume -------------------------
 export STELLA_LOG_DIR="$LOG_DIR"
 
 # ---- Set XDG_RUNTIME_DIR (required by PipeWire) ----------------------------
@@ -24,32 +31,52 @@ chmod 700 "$XDG_RUNTIME_DIR"
 # ---- Clean stale PID files from previous container runs --------------------
 rm -f /tmp/stella-*.pid
 
+# ---- Progress helpers -------------------------------------------------------
+# In dist mode: single quiet line. In devel mode: step-by-step.
+step() {
+    if [ "$BUILD_ENV" = "devel" ]; then
+        echo "  ... $1"
+    fi
+}
+
+step_ok() {
+    if [ "$BUILD_ENV" = "devel" ]; then
+        echo "  [ok] $1"
+    fi
+}
+
+step_fail() {
+    # Always show failures
+    echo "  [FAIL] $1"
+}
+
+if [ "$BUILD_ENV" = "dist" ]; then
+    echo "Starting Stella..."
+fi
+
 # ---- Start Xvfb (virtual framebuffer) ---------------------------------------
-echo "Starting Xvfb..."
+step "Starting display server"
 rm -f /tmp/.X99-lock
 Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$LOG_DIR/xvfb.log" 2>&1 &
 export DISPLAY=:99
 sleep 2
 
-# Verify display is available
 if ! xdpyinfo -display :99 >/dev/null 2>&1; then
-    echo "ERROR: Xvfb failed to start"
+    step_fail "Display server failed to start"
     exit 1
 fi
-echo "Xvfb running on :99"
+step_ok "Display server ready"
 
 # ---- Start D-Bus (required by PipeWire) -------------------------------------
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     eval "$(dbus-launch --sh-syntax)"
     export DBUS_SESSION_BUS_ADDRESS
 fi
-
-# ---- Start D-Bus system daemon (required by PipeWire/WirePlumber) -----------
 mkdir -p /run/dbus
 dbus-daemon --system --fork 2>/dev/null || true
 
 # ---- Start PipeWire + WirePlumber -------------------------------------------
-echo "Starting PipeWire..."
+step "Starting audio system"
 pipewire > "$LOG_DIR/pipewire.log" 2>&1 &
 sleep 1
 wireplumber > "$LOG_DIR/wireplumber.log" 2>&1 &
@@ -58,20 +85,12 @@ pipewire-pulse > "$LOG_DIR/pipewire-pulse.log" 2>&1 &
 sleep 2
 
 # Create virtual sinks for audio routing
-pactl load-module module-null-sink sink_name=meet_to_stella sink_properties=device.description=meet_to_stella || true
-pactl load-module module-null-sink sink_name=stella_to_meet sink_properties=device.description=stella_to_meet || true
-
-# Create a proper source from stella_to_meet's monitor so Chrome sees it as a microphone
-# (Chrome won't use .monitor sources directly — needs a real named source)
-pactl load-module module-remap-source source_name=stella_mic master=stella_to_meet.monitor source_properties=device.description=stella_mic || true
-
-# Set defaults:
-#   sink = meet_to_stella (Chrome audio output → captured by stella)
-#   source = stella_mic (stella audio output → Chrome mic input)
-pactl set-default-sink meet_to_stella
-pactl set-default-source stella_mic
-
-echo "PipeWire + WirePlumber running with virtual sinks"
+pactl load-module module-null-sink sink_name=meet_to_stella sink_properties=device.description=meet_to_stella > /dev/null 2>&1 || true
+pactl load-module module-null-sink sink_name=stella_to_meet sink_properties=device.description=stella_to_meet > /dev/null 2>&1 || true
+pactl load-module module-remap-source source_name=stella_mic master=stella_to_meet.monitor source_properties=device.description=stella_mic > /dev/null 2>&1 || true
+pactl set-default-sink meet_to_stella 2>/dev/null
+pactl set-default-source stella_mic 2>/dev/null
+step_ok "Audio system ready"
 
 # ---- Kill stale Chrome -------------------------------------------------------
 pkill -f "google-chrome.*$PORT" 2>/dev/null || true
@@ -79,7 +98,7 @@ sleep 1
 rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonSocket" 2>/dev/null || true
 
 # ---- Start Chrome ------------------------------------------------------------
-echo "Starting Chrome..."
+step "Starting Chrome"
 nohup google-chrome \
     --remote-debugging-port=$PORT \
     --user-data-dir="$PROFILE" \
@@ -94,21 +113,18 @@ nohup google-chrome \
     about:blank > "$LOG_DIR/chrome.log" 2>&1 &
 
 CHROME_PID=$!
-echo "Chrome starting (pid $CHROME_PID)..."
 sleep 5
 
-# Verify Chrome responds
 if ! curl -s http://127.0.0.1:$PORT/json/version > /dev/null; then
-    echo "ERROR: Chrome not responding on port $PORT"
-    cat "$LOG_DIR/chrome.log"
+    step_fail "Chrome failed to start (see $LOG_DIR/chrome.log)"
     exit 1
 fi
-echo "Chrome OK on port $PORT"
+step_ok "Chrome ready (port $PORT)"
 
 # ---- Auto-login to Google account -------------------------------------------
 if [ -n "$GOOGLE_EMAIL" ] && [ -n "$GOOGLE_PASSWORD" ]; then
-    echo "Attempting Google auto-login..."
-    python3 << 'PYEOF'
+    step "Logging into Google account"
+    python3 << 'PYEOF' > "$LOG_DIR/google-login.log" 2>&1
 import json, asyncio, websockets, urllib.request, hmac, hashlib, struct, base64, time as _time, os
 
 def totp_code(secret_b32):
@@ -126,13 +142,11 @@ TOTP_SECRET = os.environ.get('GOOGLE_TOTP_SECRET', '')
 CDP_PORT = os.environ.get('PORT', '18800')
 
 async def cdp_eval(ws, expr, msg_id=99):
-    """Evaluate JS via CDP and return the string result."""
     await ws.send(json.dumps({'id': msg_id, 'method': 'Runtime.evaluate', 'params': {'expression': expr}}))
     r = json.loads(await ws.recv())
     return r.get('result', {}).get('result', {}).get('value', '')
 
 async def cdp_nav(ws, url, msg_id=99):
-    """Navigate to a URL via CDP."""
     await ws.send(json.dumps({'id': msg_id, 'method': 'Page.navigate', 'params': {'url': url}}))
     await ws.recv()
 
@@ -140,7 +154,6 @@ async def get_url(ws):
     return await cdp_eval(ws, 'window.location.href')
 
 async def click_button(ws, pattern):
-    """Click the first button whose text matches the regex pattern."""
     return await cdp_eval(ws, f"""
 (function(){{
     var b = Array.from(document.querySelectorAll('button, [role=button]'));
@@ -150,7 +163,6 @@ async def click_button(ws, pattern):
 }})()""")
 
 async def fill_input(ws, selector, value):
-    """Fill an input field and dispatch input event."""
     return await cdp_eval(ws, f"""
 (function(){{
     var inp = document.querySelector('{selector}');
@@ -169,31 +181,23 @@ async def login():
     tab = next(t for t in tabs if t.get('type') == 'page')
 
     async with websockets.connect(tab['webSocketDebuggerUrl']) as ws:
-        # 1. Check if already logged in
         await cdp_nav(ws, 'https://meet.google.com')
         await asyncio.sleep(4)
         url = await get_url(ws)
-        print(f'Initial URL: {url}')
 
         if 'meet.google.com' in url and 'workspace.google.com' not in url and 'accounts.google.com' not in url:
             print('Already logged in')
             return
 
         print('Login required, proceeding...')
-
-        # 2. Navigate to sign-in page
         await cdp_nav(ws, 'https://accounts.google.com/ServiceLogin?continue=https://meet.google.com')
         await asyncio.sleep(4)
         url = await get_url(ws)
-        print(f'Sign-in page: {url}')
 
-        # 3. Handle account chooser — click the target account or "Use another account"
         if 'accountchooser' in url or 'signinchooser' in url:
             print('Account chooser detected')
-            # Try clicking on the target email if listed
             result = await cdp_eval(ws, f"""
 (function(){{
-    // Look for the account tile containing our email
     var items = document.querySelectorAll('[data-email]');
     for(var i=0; i<items.length; i++){{
         if(items[i].getAttribute('data-email').toLowerCase() === '{EMAIL}'.toLowerCase()){{
@@ -201,7 +205,6 @@ async def login():
             return 'selected:' + items[i].getAttribute('data-email');
         }}
     }}
-    // Also try matching by text content
     var divs = document.querySelectorAll('[data-identifier]');
     for(var i=0; i<divs.length; i++){{
         if(divs[i].getAttribute('data-identifier').toLowerCase() === '{EMAIL}'.toLowerCase()){{
@@ -209,7 +212,6 @@ async def login():
             return 'selected:' + divs[i].getAttribute('data-identifier');
         }}
     }}
-    // Try clicking any element that contains the email text
     var all = document.querySelectorAll('li, div[role=link], div[tabindex]');
     for(var i=0; i<all.length; i++){{
         if(all[i].textContent.includes('{EMAIL}')){{
@@ -219,55 +221,33 @@ async def login():
     }}
     return 'not_found';
 }})()""")
-            print(f'Account selection: {result}')
 
             if result == 'not_found':
-                # Click "Use another account" / "Usar otra cuenta"
                 r = await click_button(ws, r'/use another|usar otra|add.*account|añadir/i')
-                print(f'Use another account: {r}')
                 await asyncio.sleep(3)
-                # Now fill email
                 r = await fill_input(ws, 'input[type=email]', EMAIL)
-                print(f'Email fill: {r}')
                 await asyncio.sleep(1)
                 r = await click_button(ws, r'/next|siguiente/i')
-                print(f'Email next: {r}')
                 await asyncio.sleep(3)
             else:
-                # Account was selected, should go to password page
                 await asyncio.sleep(3)
-
         else:
-            # 4. Standard email entry (no account chooser)
             r = await fill_input(ws, 'input[type=email]', EMAIL)
-            print(f'Email fill: {r}')
             await asyncio.sleep(1)
             r = await click_button(ws, r'/next|siguiente/i')
-            print(f'Email next: {r}')
             await asyncio.sleep(3)
 
-        # 5. Password page
         url = await get_url(ws)
-        print(f'Password page: {url}')
         r = await fill_input(ws, 'input[type=password]', PWD)
-        print(f'Password fill: {r}')
         if r == 'not_found':
-            # Password field might be name="Passwd" on some flows
             r = await fill_input(ws, 'input[name=Passwd]', PWD)
-            print(f'Password fill (Passwd): {r}')
         await asyncio.sleep(1)
         r = await click_button(ws, r'/next|siguiente|sign.in|iniciar/i')
-        print(f'Password submit: {r}')
         await asyncio.sleep(5)
 
-        # 6. TOTP / MFA challenge
         if TOTP_SECRET:
             url = await get_url(ws)
-            print(f'Post-password URL: {url}')
-
             if 'challenge' in url or 'signin' in url:
-                # Google might show an MFA method chooser. Try to select TOTP.
-                # Look for "Google Authenticator" / "authentication app" option
                 r = await cdp_eval(ws, """
 (function(){
     var items = document.querySelectorAll('[data-challengetype], [data-sendmethod]');
@@ -278,51 +258,45 @@ async def login():
             return 'selected_totp';
         }
     }
-    // Check if we're already on the TOTP input page
     var inp = document.querySelector('input#totpPin, input[name=totpPin], input[type=tel]');
     if(inp) return 'already_on_totp';
     return 'no_totp_option';
 })()""")
-                print(f'MFA method: {r}')
 
                 if r == 'selected_totp':
                     await asyncio.sleep(3)
 
                 code = totp_code(TOTP_SECRET)
-                print(f'Entering TOTP code: {code[:2]}****')
-
                 r = await fill_input(ws, 'input#totpPin', code)
                 if r == 'not_found':
                     r = await fill_input(ws, 'input[name=totpPin]', code)
                 if r == 'not_found':
                     r = await fill_input(ws, 'input[type=tel]', code)
-                print(f'TOTP fill: {r}')
                 await asyncio.sleep(1)
-
                 r = await click_button(ws, r'/next|siguiente|verify|verificar/i')
-                print(f'TOTP submit: {r}')
                 await asyncio.sleep(5)
-            else:
-                print('No MFA challenge detected')
 
-        # 7. Verify login
         await cdp_nav(ws, 'https://meet.google.com')
         await asyncio.sleep(4)
         url = await get_url(ws)
-        print(f'Post-login URL: {url}')
         if 'meet.google.com' in url and 'workspace.google.com' not in url:
             print('Login verified OK')
         else:
-            print('WARNING: login may have failed — Chrome may not be authenticated')
+            print('WARNING: login may have failed')
 
 asyncio.run(login())
 PYEOF
-    echo "Google login complete"
-else
-    echo "GOOGLE_EMAIL/GOOGLE_PASSWORD not set, skipping auto-login"
+    if [ $? -eq 0 ]; then
+        step_ok "Google login complete"
+    else
+        step_fail "Google login failed (see $LOG_DIR/google-login.log)"
+    fi
 fi
 
-echo "Chrome ready for agent-stella"
+# ---- Daemon startup message (dist mode) ------------------------------------
+if [ "$BUILD_ENV" = "dist" ]; then
+    echo "  Starting daemon..."
+fi
 
-# ---- Start agent-stella daemon ------------------------------------------------
-exec /usr/local/bin/agent-stella daemon
+# ---- Start stella daemon ----------------------------------------------------
+exec /usr/local/bin/stella daemon

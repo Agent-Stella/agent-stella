@@ -1,11 +1,36 @@
 services:
+  # PostgreSQL with pgvector — enable with: docker compose --profile rag up
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: stella-postgres
+    restart: unless-stopped
+    attach: false
+    environment:
+      POSTGRES_DB: stella
+      POSTGRES_USER: stella
+      POSTGRES_PASSWORD: stella
+    volumes:
+      - stella-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stella"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - rag
+
+  # stella — meeting agent + embedded RAG server (if configured)
   stella:
     build:
       context: .
-    container_name: agent-stella
+    container_name: stella
     restart: unless-stopped
-    env_file:
-      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    environment:
+      STELLA_DB_HOST: postgres
     volumes:
       - ./stella-data:/app/data
     shm_size: '2gb'
@@ -13,3 +38,6 @@ services:
       resources:
         limits:
           memory: 4G
+
+volumes:
+  stella-pgdata:

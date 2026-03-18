@@ -1,5 +1,5 @@
 # =============================================================================
-# agent-stella — Docker image for Stella AI meeting agent
+# stella — Docker image for Stella AI meeting agent
 # Pre-built binary + runtime with Chrome, PipeWire, ffmpeg
 # =============================================================================
 
@@ -42,8 +42,9 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
 WORKDIR /app
 
-# Copy pre-built binary (build with src/stella-meet/build.sh first)
-COPY bin/agent-stella /usr/local/bin/agent-stella
+# Copy pre-built binary (build with src/build.sh --env dist --all-arch first)
+ARG TARGETARCH
+COPY bin/stella-linux-${TARGETARCH} /usr/local/bin/stella
 
 # Copy entrypoint script
 COPY start-chrome.sh /app/start-chrome.sh
