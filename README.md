@@ -5,17 +5,16 @@ Stella is an AI meeting agent that joins Google Meet calls as a voice participan
 ## Quick Start
 
 ```bash
-# 1. Copy the example config and fill in your OpenAI key + Google credentials
-cp stella-data/config/stella.toml.example stella-data/config/stella.toml
-# Edit stella.toml with your credentials
+# 1. Run the setup wizard
+./setup.sh
 
 # 2. Start Stella
 docker compose up --build
-
-# 3. (Optional) Enable the knowledge base
-docker compose run stella stella rag init --write
-docker compose --profile rag up --build
 ```
+
+The wizard asks for your OpenAI key, Google credentials, and whether to enable the knowledge base. It writes `stella.toml` and `docker-compose.yml` — ready to go.
+
+Re-run `./setup.sh` any time to change settings. Existing values are shown as defaults.
 
 ## Configuration
 
@@ -27,7 +26,7 @@ All settings live in `stella.toml`. The minimum configuration tiers are:
 | **+ Chrome login** | Auto-login to Google | `[basic] google_password, totp_secret` |
 | **+ Calendar** | Auto-join from calendar | `[basic] google_email` + `[calendar] credentials_file` |
 | **+ Email** | Ingest meeting transcripts | `[basic] app_password` |
-| **+ Knowledge base** | RAG search, peer memory | `stella rag init --write` |
+| **+ Knowledge base** | RAG search, peer memory | Enable via `./setup.sh` |
 
 Full reference: `stella-data/config/stella.toml.example` (every field documented).
 
@@ -77,8 +76,6 @@ docker compose run stella stella <command>
 
 | Command | Description |
 |---------|-------------|
-| `stella rag init [--write]` | Enable RAG (generates API key, writes config) |
-| `stella rag remove` | Disable RAG (removes config) |
 | `stella rag search <query>` | Search the knowledge base |
 | `stella rag document list\|ingest\|update\|delete` | Manage documents |
 | `stella rag peer list\|show\|create\|update\|delete` | Manage peer profiles |
@@ -102,7 +99,7 @@ Single binary with an embedded RAG server:
 - **daemon** — joins meetings, scans calendar, monitors email, runs RAG server
 - **CLI** — manage documents, peers, meetings, backups
 
-The daemon automatically starts the RAG knowledge base server when `[rag.database]` is configured (via `stella rag init --write`). Use `stella daemon --no-rag` to skip it.
+The daemon automatically starts the RAG knowledge base server when `[rag.database]` is configured. Use `stella daemon --no-rag` to skip it.
 
 Inside the Docker container:
 - **Xvfb** provides a virtual display (:99)
@@ -113,33 +110,15 @@ Inside the Docker container:
 ## Docker
 
 ```bash
-# Start Stella (no knowledge base)
+# Start Stella
 docker compose up --build
-
-# Start with RAG knowledge base (includes PostgreSQL)
-docker compose --profile rag up --build
 
 # Run CLI commands
 docker compose exec stella stella calendar check
 docker compose exec stella stella screenshot
 
 # Run commands without the daemon (fast, no Chrome startup)
-docker compose run stella stella rag init --write
 docker compose run stella stella validate
-```
-
-## Enabling / Disabling RAG
-
-```bash
-# Enable: generates config and API key
-docker compose run stella stella rag init --write
-# Restart with postgres
-docker compose --profile rag up --build
-
-# Disable: removes [rag] section from config
-docker compose run stella stella rag remove
-# Restart without postgres
-docker compose up
 ```
 
 ## Building
@@ -199,4 +178,4 @@ Logs: `stella-data/logs/`
 | Audio not working | `docker compose exec stella pactl list sinks short` |
 | Calendar not polling | Verify `credentials_file` + `google_email` in stella.toml |
 | Google login fails | Check `stella-data/logs/google-login.log`, verify `google_password` + `totp_secret` |
-| RAG not starting | Run `stella rag init --write`, restart with `--profile rag` |
+| RAG not starting | Run `./setup.sh` and enable the knowledge base |
