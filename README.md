@@ -12,25 +12,15 @@ Stella is an AI meeting agent that joins Google Meet calls as a voice participan
 docker compose up --build
 ```
 
-The wizard asks for your OpenAI key, Google credentials, and whether to enable the knowledge base. It writes `stella.toml` and `docker-compose.yml` — ready to go.
+The wizard walks you through three steps: OpenAI API key, Google integration level, and knowledge base (RAG) mode. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go.
 
-Re-run `./setup.sh` any time to change settings. Existing values are shown as defaults.
+Re-run `./setup.sh` any time to change settings. Your previous inputs are preserved as defaults, so you only need to override what you want to change.
 
 ## Configuration
 
-All settings live in `stella.toml`. The minimum configuration tiers are:
+The wizard is the easiest way to configure Stella, but you can also edit `stella-data/config/stella.toml` directly. See `stella-data/config/stella.toml.example` for the full reference with every field documented.
 
-| Tier | What it enables | Required settings |
-|------|----------------|-------------------|
-| **Minimal** | Join meetings via CLI | `[basic] openai_api_key` |
-| **+ Chrome login** | Auto-login to Google | `[basic] google_password, totp_secret` |
-| **+ Calendar** | Auto-join from calendar | `[basic] google_email` + `[calendar] credentials_file` |
-| **+ Email** | Ingest meeting transcripts | `[basic] app_password` |
-| **+ Knowledge base** | RAG search, peer memory | Enable via `./setup.sh` |
-
-Full reference: `stella-data/config/stella.toml.example` (every field documented).
-
-Run `stella validate` to check your configuration status:
+Run `stella validate` to check your current configuration status:
 ```bash
 docker compose exec stella stella validate
 ```
@@ -39,38 +29,21 @@ docker compose exec stella stella validate
 
 All commands can be run inside the container:
 ```bash
+# While the daemon is running:
 docker compose exec stella stella <command>
 
-# For commands that don't need the daemon running:
+# Without the daemon (fast, no Chrome startup):
 docker compose run stella stella <command>
 ```
-
-### Services
-
-| Command | Description |
-|---------|-------------|
-| `stella daemon [--no-rag]` | Run the meeting agent (+ embedded RAG if configured) |
 
 ### Meetings
 
 | Command | Description |
 |---------|-------------|
-| `stella meet join [flags] <url>` | Join a Google Meet call |
+| `stella meet join [flags] <url>` | Join an existing Google Meet call |
 | `stella meet create [flags]` | Create a new meeting and join it |
 
-### Calendar
-
-| Command | Description |
-|---------|-------------|
-| `stella calendar check` | Show pending calendar events |
-| `stella calendar accept <event-id>` | Accept a calendar invitation |
-| `stella calendar reject <event-id>` | Decline a calendar invitation |
-
-### Email
-
-| Command | Description |
-|---------|-------------|
-| `stella email check` | Scan inbox for meeting transcriptions |
+Both commands accept flags for voice, language, context, and participant hints. Run `stella meet join --help` for details.
 
 ### RAG (Knowledge Base)
 
@@ -92,46 +65,6 @@ docker compose run stella stella <command>
 | `stella validate` | Check configuration and print status |
 | `stella version` | Print version |
 | `stella screenshot` | Debug: screenshot current Chrome tab |
-
-## Architecture
-
-Single binary with an embedded RAG server:
-- **daemon** — joins meetings, scans calendar, monitors email, runs RAG server
-- **CLI** — manage documents, peers, meetings, backups
-
-The daemon automatically starts the RAG knowledge base server when `[rag.database]` is configured. Use `stella daemon --no-rag` to skip it.
-
-Inside the Docker container:
-- **Xvfb** provides a virtual display (:99)
-- **PipeWire** routes audio between Chrome and the OpenAI Realtime API
-- **Chrome** runs with CDP on port 18800, auto-logged into the Google account
-- **stella daemon** orchestrates everything
-
-## Docker
-
-```bash
-# Start Stella
-docker compose up --build
-
-# Run CLI commands
-docker compose exec stella stella calendar check
-docker compose exec stella stella screenshot
-
-# Run commands without the daemon (fast, no Chrome startup)
-docker compose run stella stella validate
-```
-
-## Building
-
-```bash
-# Dev build (native platform only)
-./src/build.sh --env devel
-
-# Release build (all platforms: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64)
-./src/build.sh --env dist --all-arch
-```
-
-Output goes to `agent-stella/bin/stella-{os}-{arch}`.
 
 ## Prerequisites
 
