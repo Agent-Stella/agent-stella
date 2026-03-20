@@ -9,9 +9,6 @@ stella-data/cache/
 stella-data/config/stella.toml
 docker-compose.yml
 
-# Pre-built binaries
-bin/
-
 # Environment
 .env
 .env.*
