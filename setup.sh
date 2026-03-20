@@ -90,10 +90,12 @@ if [[ -z "$openai_key" ]]; then
   exit 1
 fi
 
-# ── 2. Google account ──────────────────────────────────────────
+# ── 2. Google Workspace account ───────────────────────────────
 
 echo ""
-echo "2. Google account — needed for Chrome to log into Google Meet."
+echo "2. Google Workspace account — required for Meet, Calendar, and Email."
+echo "   Stella needs a dedicated Workspace user with a service account"
+echo "   (domain-wide delegation) and 2FA enabled."
 
 google_email=""
 google_password=""
@@ -106,45 +108,16 @@ email_enabled="false"
 echo ""
 prompt google_email "Google email" "$cur_google_email"
 prompt google_password "Google password" "$cur_google_password" true
-prompt totp_secret "TOTP secret (if 2FA enabled)" "$cur_totp_secret" true
+prompt totp_secret "TOTP secret (2FA)" "$cur_totp_secret" true
+prompt credentials_file "Service account file (relative to stella-data/)" "${cur_credentials_file:-credentials/sa.json}"
+prompt app_password "App password (IMAP)" "$cur_app_password" true
+calendar_enabled="true"
+email_enabled="true"
 
-# ── 3. Workspace integration ──────────────────────────────────
-
-echo ""
-echo "3. Stella can integrate with Calendar and Email via Google Workspace."
-echo "   This requires a service account with domain-wide delegation"
-echo "   and an app password for IMAP."
-echo "   a) Yes, enable Workspace integration (recommended)"
-echo "   b) No, skip"
-
-# Determine default based on existing config.
-workspace_default="a"
-if [[ -z "$cur_credentials_file" && -z "$cur_app_password" ]]; then
-  workspace_default="b"
-fi
-read -rp "  Choice [$workspace_default]: " workspace_choice
-workspace_choice="${workspace_choice:-$workspace_default}"
-
-case "$workspace_choice" in
-  a|A)
-    echo ""
-    prompt credentials_file "Service account file (relative to stella-data/)" "${cur_credentials_file:-credentials/sa.json}"
-    prompt app_password "App password (IMAP)" "$cur_app_password" true
-    calendar_enabled="true"
-    email_enabled="true"
-    ;;
-  b|B)
-    ;;
-  *)
-    echo "Invalid choice."
-    exit 1
-    ;;
-esac
-
-# ── 4. Knowledge base ───────────────────────────────────────────
+# ── 3. Knowledge base ───────────────────────────────────────────
 
 echo ""
-echo "4. Stella can have a Knowledge Base, so called RAG. It can run on a local"
+echo "3. Stella can have a Knowledge Base, so called RAG. It can run on a local"
 echo "   database (no setup needed, perfect for data sovereignty) or an external"
 echo "   one. Do you want to enable RAG?"
 echo "   a) Built-in database — no setup needed (recommended)"

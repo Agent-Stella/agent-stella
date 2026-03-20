@@ -12,7 +12,7 @@ Stella is an AI meeting agent that joins Google Meet calls as a voice participan
 docker compose up --build
 ```
 
-The wizard walks you through three steps: OpenAI API key, Google integration level, and knowledge base (RAG) mode. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go.
+The wizard walks you through three steps: OpenAI API key, Google Workspace account, and knowledge base (RAG) mode. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go.
 
 Re-run `./setup.sh` any time to change settings. Your previous inputs are preserved as defaults, so you only need to override what you want to change.
 
@@ -70,19 +70,26 @@ Both commands accept flags for voice, language, context, and participant hints. 
 
 - Docker and Docker Compose
 - OpenAI API key (with Realtime API access)
-- Google Workspace account dedicated to the agent
-- Google Cloud project with Calendar, Meet, and Drive APIs enabled
+- A **Google Workspace** account dedicated to the agent (basic Gmail is not supported)
+- A Google Cloud project with the APIs listed below
+
+Stella requires a Workspace account because it uses the **Google Meet REST API** to create meetings, the **Calendar API** to discover and join scheduled meetings, and the **Drive API** to access meeting transcripts. These APIs require a service account with domain-wide delegation, which is only available in Google Workspace.
 
 ## Google Workspace Setup
 
 1. Create a dedicated Google Workspace user (e.g., `stella@yourdomain.com`)
 2. Enable 2-Step Verification and save the TOTP secret
-3. Create a Google Cloud project with Calendar, Meet, and Drive APIs
-4. Create a service account with domain-wide delegation
-5. Grant these scopes:
+3. Generate an App Password for IMAP access (for email transcript scanning)
+4. Create a Google Cloud project and enable these APIs:
+   - Google Calendar API
+   - Google Meet REST API
+   - Google Drive API
+5. Create a service account with domain-wide delegation
+6. Grant these scopes to the service account:
    - `https://www.googleapis.com/auth/calendar.events`
    - `https://www.googleapis.com/auth/meetings.space.created`
    - `https://www.googleapis.com/auth/drive.readonly`
+7. Download the service account JSON key and place it in `stella-data/credentials/`
 
 ## stella-data Directory
 
