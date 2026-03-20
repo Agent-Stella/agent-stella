@@ -2,6 +2,32 @@
 
 Stella is an AI meeting agent that joins Google Meet calls as a voice participant. She listens, speaks, and answers questions using a knowledge base — replacing passive notetakers with an active team member.
 
+## Prerequisites
+
+- **Docker** and **Docker Compose**
+- An **OpenAI API key** with Realtime API access
+- A **Google Workspace** account dedicated to the agent (basic Gmail is not supported)
+- A **Google Cloud project** with Calendar, Meet, and Drive APIs enabled
+- A **service account** with domain-wide delegation
+
+Stella requires Google Workspace because it uses the **Meet REST API** to create meetings, the **Calendar API** to discover and auto-join scheduled meetings, and the **Drive API** to access meeting transcripts shared via email. These APIs require a service account with domain-wide delegation, which is only available in Google Workspace.
+
+## Google Workspace Setup
+
+1. Create a dedicated Google Workspace user (e.g., `stella@yourdomain.com`)
+2. Enable **2-Step Verification** and save the TOTP secret (Stella uses it for automated Chrome login)
+3. Generate an **App Password** for IMAP access at https://myaccount.google.com/apppasswords
+4. Create a **Google Cloud project** and enable these APIs:
+   - Google Calendar API
+   - Google Meet REST API
+   - Google Drive API
+5. Create a **service account** with domain-wide delegation
+6. Grant these scopes to the service account:
+   - `https://www.googleapis.com/auth/calendar.events`
+   - `https://www.googleapis.com/auth/meetings.space.created`
+   - `https://www.googleapis.com/auth/drive.readonly`
+7. Download the service account JSON key and place it in `stella-data/credentials/`
+
 ## Quick Start
 
 ```bash
@@ -12,22 +38,79 @@ Stella is an AI meeting agent that joins Google Meet calls as a voice participan
 docker compose up --build
 ```
 
-The wizard walks you through three steps: OpenAI API key, Google Workspace account, and knowledge base (RAG) mode. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go.
+The wizard walks you through three steps: OpenAI API key, Google Workspace credentials, and knowledge base mode. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go.
 
-Re-run `./setup.sh` any time to change settings. Your previous inputs are preserved as defaults, so you only need to override what you want to change.
+Re-run `./setup.sh` any time to change settings. Your previous inputs are preserved as defaults, so you only need to override what you want to change. You can also edit `stella-data/config/stella.toml` directly (see `stella.toml.example` for the full reference).
 
-## Configuration
+## What Stella Can Do
 
-The wizard is the easiest way to configure Stella, but you can also edit `stella-data/config/stella.toml` directly. See `stella-data/config/stella.toml.example` for the full reference with every field documented.
+### Meetings
 
-Run `stella validate` to check your current configuration status:
+Create a meeting on the spot or join an existing one:
+
 ```bash
-docker compose exec stella stella validate
+# Create a new meeting and join it
+docker compose exec stella stella meet create --context "Weekly sync"
+
+# Join an existing meeting
+docker compose exec stella stella meet join https://meet.google.com/abc-defg-hij
+
+# With specific voice, language, and context
+docker compose exec stella stella meet join \
+  --voice ash --lang español \
+  --context "Q1 review — focus on revenue targets" \
+  https://meet.google.com/abc-defg-hij
 ```
 
-## Commands
+### Calendar Integration
 
-All commands can be run inside the container:
+Stella monitors her Google Calendar and autonomously joins meetings:
+
+- **Auto-discovery**: Scans the calendar every 5 minutes for upcoming events with a Google Meet link.
+- **Auto-accept**: If the event host is a known peer in Stella's memory (RAG), the invitation is accepted automatically.
+- **Owner notification**: If the host is unknown, Stella notifies the owner so they can accept or reject the invitation.
+- **Auto-join**: Joins the meeting 10 minutes before the scheduled start time, with a briefing prepared from the RAG.
+
+### Hosting Meetings
+
+When Stella is the meeting organizer (e.g., a meeting created by Stella herself or orchestrated through an external agent like Openclaw):
+
+- **Guest admission**: Automatically admits participants from the lobby.
+- **Gemini transcription**: Enables Google's built-in Gemini notes and transcription.
+
+### Email & Transcript Ingestion
+
+Stella scans her inbox for meeting transcriptions from services like Otter.ai, Fireflies, Google Meet recordings, and others. These are automatically ingested into the knowledge base, building Stella's institutional memory over time.
+
+### Knowledge Base (RAG)
+
+Stella maintains a knowledge base backed by PostgreSQL/pgvector. It stores documents, peer profiles, and meeting history — all searchable via hybrid search (semantic + full-text) during meetings.
+
+#### Manual document management
+
+```bash
+# Ingest a document
+docker compose exec stella stella rag document ingest \
+  --title "Company Handbook" --type pdf --source /app/data/docs/handbook.pdf
+
+# Search the knowledge base
+docker compose exec stella stella rag search "quarterly revenue targets"
+
+# List all documents
+docker compose exec stella stella rag document list
+
+# Manage peer profiles
+docker compose exec stella stella rag peer create \
+  --name "Jane Smith" --email jane@example.com --position "VP Engineering"
+docker compose exec stella stella rag peer list
+```
+
+#### Integration with external agents
+
+The RAG server exposes a REST API and MCP (Model Context Protocol) interface on port 8080 inside the container. This allows external agents like **Openclaw** to ingest documents from various channels (Slack, Telegram, email, web) directly into Stella's knowledge base, keeping her always up to date.
+
+## All Commands
+
 ```bash
 # While the daemon is running:
 docker compose exec stella stella <command>
@@ -36,60 +119,21 @@ docker compose exec stella stella <command>
 docker compose run stella stella <command>
 ```
 
-### Meetings
-
 | Command | Description |
 |---------|-------------|
 | `stella meet join [flags] <url>` | Join an existing Google Meet call |
 | `stella meet create [flags]` | Create a new meeting and join it |
-
-Both commands accept flags for voice, language, context, and participant hints. Run `stella meet join --help` for details.
-
-### RAG (Knowledge Base)
-
-| Command | Description |
-|---------|-------------|
 | `stella rag search <query>` | Search the knowledge base |
 | `stella rag document list\|ingest\|update\|delete` | Manage documents |
 | `stella rag peer list\|show\|create\|update\|delete` | Manage peer profiles |
 | `stella rag meeting list\|show\|create\|update\|delete` | Manage meeting records |
 | `stella rag migrate` | Run database migrations |
-| `stella rag serve [port]` | Start RAG server standalone (default: 8080) |
-
-### Tools
-
-| Command | Description |
-|---------|-------------|
 | `stella backup dump\|restore\|list` | Database backup and restore |
-| `stella upgrade check\|apply` | Check for and install updates |
 | `stella validate` | Check configuration and print status |
 | `stella version` | Print version |
 | `stella screenshot` | Debug: screenshot current Chrome tab |
 
-## Prerequisites
-
-- Docker and Docker Compose
-- OpenAI API key (with Realtime API access)
-- A **Google Workspace** account dedicated to the agent (basic Gmail is not supported)
-- A Google Cloud project with the APIs listed below
-
-Stella requires a Workspace account because it uses the **Google Meet REST API** to create meetings, the **Calendar API** to discover and join scheduled meetings, and the **Drive API** to access meeting transcripts. These APIs require a service account with domain-wide delegation, which is only available in Google Workspace.
-
-## Google Workspace Setup
-
-1. Create a dedicated Google Workspace user (e.g., `stella@yourdomain.com`)
-2. Enable 2-Step Verification and save the TOTP secret
-3. Generate an App Password for IMAP access (for email transcript scanning)
-4. Create a Google Cloud project and enable these APIs:
-   - Google Calendar API
-   - Google Meet REST API
-   - Google Drive API
-5. Create a service account with domain-wide delegation
-6. Grant these scopes to the service account:
-   - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/meetings.space.created`
-   - `https://www.googleapis.com/auth/drive.readonly`
-7. Download the service account JSON key and place it in `stella-data/credentials/`
+Run `stella meet join --help` for meeting-specific flags (voice, language, context, participants, etc.).
 
 ## stella-data Directory
 
