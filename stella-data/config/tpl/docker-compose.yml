@@ -1,0 +1,15 @@
+services:
+  stella:
+    build:
+      context: .
+    container_name: stella
+    restart: unless-stopped
+    environment:
+      STELLA_DB_HOST: postgres
+    volumes:
+      - ./stella-data:/app/data
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 4G

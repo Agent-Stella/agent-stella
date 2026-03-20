@@ -125,9 +125,7 @@ case "$google_choice" in
     email_enabled="true"
     ;;
   b|B)
-    prompt google_email "Google email (optional)" "$cur_google_email"
-    prompt google_password "Google password (optional)" "$cur_google_password" true
-    prompt totp_secret "TOTP secret (2FA, optional)" "$cur_totp_secret" true
+    # Basic mode: no credentials needed, Chrome handles Meet access.
     ;;
   *)
     echo "Invalid choice."
