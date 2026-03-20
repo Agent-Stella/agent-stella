@@ -90,20 +90,10 @@ if [[ -z "$openai_key" ]]; then
   exit 1
 fi
 
-# ── 2. Google integration level ─────────────────────────────────
+# ── 2. Google account ──────────────────────────────────────────
 
 echo ""
-echo "2. Stella integrates with Calendar and Email. Do you want full integration?"
-echo "   a) Yes, full integration (recommended)"
-echo "   b) No, just basic Google Meet access"
-
-# Determine default based on existing config.
-google_default="a"
-if [[ -z "$cur_credentials_file" && -z "$cur_app_password" ]]; then
-  google_default="b"
-fi
-read -rp "  Choice [$google_default]: " google_choice
-google_choice="${google_choice:-$google_default}"
+echo "2. Google account — needed for Chrome to log into Google Meet."
 
 google_email=""
 google_password=""
@@ -113,19 +103,37 @@ credentials_file=""
 calendar_enabled="false"
 email_enabled="false"
 
-case "$google_choice" in
+echo ""
+prompt google_email "Google email" "$cur_google_email"
+prompt google_password "Google password" "$cur_google_password" true
+prompt totp_secret "TOTP secret (if 2FA enabled)" "$cur_totp_secret" true
+
+# ── 3. Workspace integration ──────────────────────────────────
+
+echo ""
+echo "3. Stella can integrate with Calendar and Email via Google Workspace."
+echo "   This requires a service account with domain-wide delegation"
+echo "   and an app password for IMAP."
+echo "   a) Yes, enable Workspace integration (recommended)"
+echo "   b) No, skip"
+
+# Determine default based on existing config.
+workspace_default="a"
+if [[ -z "$cur_credentials_file" && -z "$cur_app_password" ]]; then
+  workspace_default="b"
+fi
+read -rp "  Choice [$workspace_default]: " workspace_choice
+workspace_choice="${workspace_choice:-$workspace_default}"
+
+case "$workspace_choice" in
   a|A)
     echo ""
-    prompt google_email "Google email" "$cur_google_email"
-    prompt google_password "Google password" "$cur_google_password" true
-    prompt totp_secret "TOTP secret (2FA)" "$cur_totp_secret" true
-    prompt app_password "App password (IMAP)" "$cur_app_password" true
     prompt credentials_file "Service account file (relative to stella-data/)" "${cur_credentials_file:-credentials/sa.json}"
+    prompt app_password "App password (IMAP)" "$cur_app_password" true
     calendar_enabled="true"
     email_enabled="true"
     ;;
   b|B)
-    # Basic mode: no credentials needed, Chrome handles Meet access.
     ;;
   *)
     echo "Invalid choice."
@@ -133,10 +141,10 @@ case "$google_choice" in
     ;;
 esac
 
-# ── 3. Knowledge base ───────────────────────────────────────────
+# ── 4. Knowledge base ───────────────────────────────────────────
 
 echo ""
-echo "3. Stella can have a Knowledge Base, so called RAG. It can run on a local"
+echo "4. Stella can have a Knowledge Base, so called RAG. It can run on a local"
 echo "   database (no setup needed, perfect for data sovereignty) or an external"
 echo "   one. Do you want to enable RAG?"
 echo "   a) Built-in database — no setup needed (recommended)"
