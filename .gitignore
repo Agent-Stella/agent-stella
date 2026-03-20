@@ -1,0 +1,17 @@
+# Runtime data
+stella-data/logs/
+stella-data/credentials/
+stella-data/chrome-profile/
+stella-data/backup/
+stella-data/cache/
+
+# Generated config (contains secrets)
+stella-data/config/stella.toml
+docker-compose.yml
+
+# Pre-built binaries
+bin/
+
+# Environment
+.env
+.env.*
