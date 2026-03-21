@@ -72,21 +72,20 @@ keywords = ["notes", "transcript", "meeting", "summary", "recording"]
                                      #   If set, enables email notifications about new meetings
 
 # ── RAG (knowledge base) ─────────────────────────────────────
+# RAG is always active. A database password is required.
 
 [rag]
-enabled = false                      # Auto-detected from URL or database config
 url = "http://localhost:8080"        # env: STELLA_RAG_URL
 # api_key = ""                       # env: STELLA_RAG_KEY
 
-# ── RAG database (for local mode: stella rag serve) ──────────
+# ── RAG database ─────────────────────────────────────────────
 
 [rag.database]
 host = "localhost"                   # env: STELLA_DB_HOST
 port = 5432                          # env: STELLA_DB_PORT
 name = "stella"                      # env: STELLA_DB_NAME
 user = "stella"                      # env: STELLA_DB_USER
-# password = ""                      # env: STELLA_DB_PASSWORD
-sslmode = "disable"                  # env: STELLA_DB_SSLMODE
+# password = ""                      # env: STELLA_DB_PASSWORD (required)
 
 # ── RAG backup ────────────────────────────────────────────────
 

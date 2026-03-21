@@ -14,19 +14,47 @@ Stella requires Google Workspace because it uses the **Meet REST API** to create
 
 ## Google Workspace Setup
 
-1. Create a dedicated Google Workspace user (e.g., `stella@yourdomain.com`)
-2. Enable **2-Step Verification** and save the TOTP secret (Stella uses it for automated Chrome login)
-3. Generate an **App Password** for IMAP access at https://myaccount.google.com/apppasswords
-4. Create a **Google Cloud project** and enable these APIs:
+### 1. Create a dedicated Workspace user
+
+In **Google Workspace Admin** (`admin.google.com`) → Directory → Users, create a user for the agent (e.g., `stella@yourdomain.com`).
+
+### 2. Configure the user account
+
+Sign in as the new user and complete these steps:
+
+1. Enable **2-Step Verification** at https://myaccount.google.com/signinoptions/two-step-verification — choose the **Authenticator app** option and save the TOTP secret (the text code shown during setup). Stella uses it for automated Chrome login.
+2. Generate an **App Password** at https://myaccount.google.com/apppasswords — Stella uses it for IMAP access to scan transcription emails.
+
+### 3. Create a GCP project and enable APIs
+
+In **Google Cloud Console** (`console.cloud.google.com`):
+
+1. Create a new project (or use an existing one).
+2. Go to **APIs & Services → Library** and enable:
    - Google Calendar API
    - Google Meet REST API
    - Google Drive API
-5. Create a **service account** with domain-wide delegation
-6. Grant these scopes to the service account:
-   - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/meetings.space.created`
-   - `https://www.googleapis.com/auth/drive.readonly`
-7. Download the service account JSON key and place it in `stella-data/credentials/`
+
+### 4. Create a service account
+
+Still in **Google Cloud Console**:
+
+1. Go to **IAM & Admin → Service Accounts** and create a new service account.
+2. On the service account details page, go to the **Keys** tab → **Add Key → Create new key** → JSON. Save the downloaded file to `stella-data/credentials/`.
+
+### 5. Set up domain-wide delegation
+
+This step connects the GCP service account to your Workspace domain so it can act on behalf of the agent user.
+
+1. In **Google Cloud Console**, go to the service account details page and note the **Client ID** (a numeric ID, not the email).
+2. In **Google Workspace Admin** (`admin.google.com`), go to **Security → Access and data control → API controls → Domain-wide delegation → Manage Domain Wide Delegation**.
+3. Click **Add new** and enter:
+   - **Client ID**: the numeric ID from step 1
+   - **OAuth scopes** (comma-separated):
+     ```
+     https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/meetings.space.created,https://www.googleapis.com/auth/drive.readonly
+     ```
+4. Click **Authorize**.
 
 ## Quick Start
 
@@ -38,7 +66,7 @@ Stella requires Google Workspace because it uses the **Meet REST API** to create
 docker compose up --build
 ```
 
-The wizard walks you through three steps: OpenAI API key, Google Workspace credentials, and knowledge base mode. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go.
+The wizard walks you through two steps: OpenAI API key and Google Workspace credentials. It generates `stella-data/config/stella.toml` and `docker-compose.yml` — ready to go. The knowledge base (RAG) is always included with a local PostgreSQL database.
 
 Re-run `./setup.sh` any time to change settings. Your previous inputs are preserved as defaults, so you only need to override what you want to change. You can also edit `stella-data/config/stella.toml` directly (see `stella.toml.example` for the full reference).
 
@@ -84,7 +112,7 @@ Stella scans her inbox for meeting transcriptions from services like Otter.ai, F
 
 ### Knowledge Base (RAG)
 
-Stella maintains a knowledge base backed by PostgreSQL/pgvector. It stores documents, peer profiles, and meeting history — all searchable via hybrid search (semantic + full-text) during meetings.
+Stella maintains a knowledge base backed by a local PostgreSQL/pgvector database. It stores documents, peer profiles, and meeting history — all searchable via hybrid search (semantic + full-text) during meetings. RAG is always active and included automatically.
 
 #### Manual document management
 
@@ -162,4 +190,4 @@ Logs: `stella-data/logs/`
 | Audio not working | `docker compose exec stella pactl list sinks short` |
 | Calendar not polling | Verify `credentials_file` + `google_email` in stella.toml |
 | Google login fails | Check `stella-data/logs/google-login.log`, verify `google_password` + `totp_secret` |
-| RAG not starting | Run `./setup.sh` and enable the knowledge base |
+| RAG not starting | Check `rag.database.password` in stella.toml; re-run `./setup.sh` |

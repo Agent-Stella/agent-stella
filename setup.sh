@@ -47,10 +47,6 @@ toml_get() {
   fi
 }
 
-current_compose_has_postgres() {
-  [[ -f "$COMPOSE_FILE" ]] && grep -q 'pgvector/pgvector' "$COMPOSE_FILE" 2>/dev/null
-}
-
 # ── Banner ───────────────────────────────────────────────────────
 
 echo ""
@@ -70,17 +66,9 @@ cur_credentials_file="${cur_credentials_file_raw#/app/data/}"
 cur_rag_api_key="$(toml_get api_key)"
 cur_db_password="$(toml_get password)"
 
-# Detect current RAG mode from existing config.
-cur_rag_mode="disabled"
-if [[ -n "$cur_rag_api_key" ]] && current_compose_has_postgres; then
-  cur_rag_mode="builtin"
-elif [[ -n "$cur_rag_api_key" ]]; then
-  cur_rag_mode="external"
-fi
-
 # ── 1. OpenAI API Key ───────────────────────────────────────────
 
-echo "1. OpenAI is used for realtime voice and managing RAG vectors."
+echo "1. OpenAI is used for realtime voice and the knowledge base (RAG embeddings)."
 echo "   Provide an OpenAI API key that supports both."
 echo ""
 prompt openai_key "OpenAI API Key (required)" "$cur_openai_key" true
@@ -114,78 +102,10 @@ prompt app_password "App password (IMAP)" "$cur_app_password" true
 calendar_enabled="true"
 email_enabled="true"
 
-# ── 3. Knowledge base ───────────────────────────────────────────
+# ── Generate RAG secrets ─────────────────────────────────────────
 
-echo ""
-echo "3. Stella can have a Knowledge Base, so called RAG. It can run on a local"
-echo "   database (no setup needed, perfect for data sovereignty) or an external"
-echo "   one. Do you want to enable RAG?"
-echo "   a) Built-in database — no setup needed (recommended)"
-echo "   b) External database"
-echo "   c) Disabled"
-
-# Default based on current mode.
-case "$cur_rag_mode" in
-  builtin)  rag_default="a" ;;
-  external) rag_default="b" ;;
-  *)        rag_default="c" ;;
-esac
-read -rp "  Choice [$rag_default]: " rag_choice
-rag_choice="${rag_choice:-$rag_default}"
-
-rag_api_key=""
-db_host=""
-db_port=""
-db_name=""
-db_user=""
-db_password=""
-db_sslmode=""
-use_builtin_db=false
-
-case "$rag_choice" in
-  a|A)
-    use_builtin_db=true
-    rag_api_key="${cur_rag_api_key:-sk-stella-$(openssl rand -hex 24)}"
-    db_host="postgres"
-    db_port="5432"
-    db_name="stella"
-    db_user="stella"
-    db_password="${cur_db_password:-$(openssl rand -hex 16)}"
-    db_sslmode="disable"
-    ;;
-  b|B)
-    rag_api_key="${cur_rag_api_key:-sk-stella-$(openssl rand -hex 24)}"
-    echo ""
-    prompt db_host "Database host" "${cur_db_host:-localhost}"
-    prompt db_port "Database port" "5432"
-    prompt db_name "Database name" "stella"
-    prompt db_user "Database user" "stella"
-    prompt db_password "Database password" "$cur_db_password" true
-    prompt db_sslmode "SSL mode (disable/require)" "disable"
-    ;;
-  c|C)
-    # RAG disabled — no config needed.
-    ;;
-  *)
-    echo "Invalid choice."
-    exit 1
-    ;;
-esac
-
-# ── Downgrade check: postgres removal ───────────────────────────
-
-if current_compose_has_postgres && [[ "$use_builtin_db" == "false" ]]; then
-  echo ""
-  echo "Warning: This will remove the local PostgreSQL database and all stored data."
-  read -rp "Proceed? [y/N]: " confirm
-  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-    echo "Aborted — no changes made."
-    exit 0
-  fi
-  echo "Cleaning up containers and volumes..."
-  (cd "$SCRIPT_DIR" && docker compose down -v 2>/dev/null || true)
-  docker rmi pgvector/pgvector:pg17 2>/dev/null || true
-fi
+rag_api_key="${cur_rag_api_key:-sk-stella-$(openssl rand -hex 24)}"
+db_password="${cur_db_password:-$(openssl rand -hex 16)}"
 
 # ── Write stella.toml ────────────────────────────────────────────
 
@@ -277,11 +197,6 @@ keywords = ["notes", "transcript", "meeting", "summary", "recording"]
 [owner]
 # name = "Your Name"
 # email = "you@example.com"
-TOML
-
-# RAG section.
-if [[ -n "$rag_api_key" ]]; then
-  cat >> "$CONFIG_FILE" << TOML
 
 # ── RAG (knowledge base) ─────────────────────────────────────
 
@@ -289,22 +204,16 @@ if [[ -n "$rag_api_key" ]]; then
 api_key = "$rag_api_key"
 
 [rag.database]
-host = "$db_host"
-port = $db_port
-name = "$db_name"
-user = "$db_user"
+host = "postgres"
+port = 5432
+name = "stella"
+user = "stella"
 password = "$db_password"
-sslmode = "$db_sslmode"
 TOML
-fi
 
 # ── Write docker-compose.yml ────────────────────────────────────
 
-if [[ "$use_builtin_db" == "true" ]]; then
-  sed "s/__DB_PASSWORD__/$db_password/g" "$TPL_DIR/docker-compose.rag.yml" > "$COMPOSE_FILE"
-else
-  cp "$TPL_DIR/docker-compose.yml" "$COMPOSE_FILE"
-fi
+sed "s/__DB_PASSWORD__/$db_password/g" "$TPL_DIR/docker-compose.yml" > "$COMPOSE_FILE"
 
 # ── Done ─────────────────────────────────────────────────────────
 

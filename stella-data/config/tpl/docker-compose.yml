@@ -1,9 +1,29 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: stella-postgres
+    restart: unless-stopped
+    attach: false
+    environment:
+      POSTGRES_DB: stella
+      POSTGRES_USER: stella
+      POSTGRES_PASSWORD: __DB_PASSWORD__
+    volumes:
+      - stella-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stella"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   stella:
     build:
       context: .
     container_name: stella
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       STELLA_DB_HOST: postgres
     volumes:
@@ -13,3 +33,6 @@ services:
       resources:
         limits:
           memory: 4G
+
+volumes:
+  stella-pgdata:
