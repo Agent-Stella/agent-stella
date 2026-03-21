@@ -161,7 +161,7 @@ docker compose run stella stella <command>
 | `stella version` | Print version |
 | `stella screenshot` | Debug: screenshot current Chrome tab |
 
-Run `stella meet join --help` for meeting-specific flags (voice, language, context, participants, etc.).
+See the [Usage Guide](doc/usage.md) for detailed syntax, examples, and all available options for every command.
 
 ## stella-data Directory
 
