@@ -28,6 +28,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg pulseaudio-utils \
         python3 python3-websockets \
         xvfb x11-utils dbus-x11 dbus-user-session procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-17 \
     && rm -rf /var/lib/apt/lists/*
 
 # Symlink chromium → google-chrome for start-chrome.sh compatibility
