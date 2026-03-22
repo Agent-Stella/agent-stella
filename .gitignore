@@ -1,6 +1,7 @@
 # Runtime data
 stella-data/logs/
-stella-data/credentials/
+stella-data/credentials/*
+!stella-data/credentials/.gitkeep
 stella-data/chrome-profile/
 stella-data/backup/
 stella-data/cache/
