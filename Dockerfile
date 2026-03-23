@@ -49,9 +49,20 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
 WORKDIR /app
 
+# Install Tesseract OCR (for image-only PDFs) and Python parsing dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip tesseract-ocr tesseract-ocr-eng \
+    && pip3 install --no-cache-dir --break-system-packages \
+       pymupdf pymupdf4llm python-docx python-pptx trafilatura pytesseract Pillow \
+    && apt-get purge -y python3-pip && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy pre-built binary (build with src/build.sh --env dist --all-arch first)
 ARG TARGETARCH
 COPY bin/stella-linux-${TARGETARCH} /usr/local/bin/stella
+
+# Copy Python document parser
+COPY parse/stella_parse.py /app/parse.py
 
 # Copy entrypoint script
 COPY start-chrome.sh /app/start-chrome.sh
