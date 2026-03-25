@@ -4,11 +4,11 @@ This guide walks through setting up Google integration for Stella. Return to the
 
 ## 1. Create a dedicated Google Workspace user
 
-In **Google Workspace Admin** (`admin.google.com`) > Directory > Users, create a user for the agent (e.g., `stella@yourdomain.com`).
+In **Google Workspace Admin** ([admin.google.com](https://admin.google.com)) > Directory > Users, create a user for the agent (e.g., `stella@yourdomain.com`).
 
 ## 2. Create a GCP project and enable APIs
 
-In **Google Cloud Console** (`console.cloud.google.com`):
+In **Google Cloud Console** ([console.cloud.google.com](https://console.cloud.google.com)):
 
 1. Create a new project (or use an existing one).
 2. Go to **APIs & Services > Library** and enable:
@@ -56,7 +56,7 @@ Still in **Google Cloud Console**:
 
 If you want to add 2FA security to the Stella Google account:
 
-1. Sign in as the Stella user and enable **2-Step Verification** at https://myaccount.google.com/signinoptions/two-step-verification.
+1. Sign in as the Stella user and enable **2-Step Verification** at [myaccount.google.com/signinoptions/two-step-verification](https://myaccount.google.com/signinoptions/two-step-verification).
 2. Choose the **Authenticator app** option and save the TOTP secret.
 3. Enter the TOTP secret in Stella's Google settings (Settings > Google > Edit > TOTP Secret).
 
