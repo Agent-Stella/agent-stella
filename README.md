@@ -22,21 +22,21 @@ Follow the [Google Setup Guide](doc/google-workspace-setup.md) to create the ded
 # 1. Run the setup wizard
 ./setup.sh
 
-# 2. Start Stella
-docker compose up --build
+# 2. Create the web admin user
+docker compose run --rm stella stella web setup
 
-# 3. Create the web admin user
-docker compose exec stella stella web setup
+# 3. Start Stella
+docker compose up --build -d
 ```
 
 The setup wizard generates `stella-data/config/stella.toml` and `docker-compose.yml`. The knowledge base runs on a local PostgreSQL database included automatically.
 
 ### Web Management UI
 
-After running `stella web setup`, the web interface is available at:
+After starting Stella, the web interface is available at:
 
 ```
-http://localhost:5180
+http://<your-server-ip>:5180
 ```
 
 From the web UI you can:

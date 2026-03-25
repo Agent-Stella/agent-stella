@@ -198,8 +198,10 @@ sed "s/__DB_PASSWORD__/$db_password/g" "$TPL_DIR/docker-compose.yml" > "$COMPOSE
 echo ""
 echo "All set! Configuration written to stella-data/config/stella.toml"
 echo ""
+PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "<your-server-ip>")
+
 echo "Next steps:"
-echo "  1. docker compose up --build"
-echo "  2. docker compose exec stella stella web setup"
-echo "  3. Open http://localhost:5180 and go to Settings > Google to connect OAuth"
+echo "  1. docker compose run --rm stella stella web setup"
+echo "  2. docker compose up --build -d"
+echo "  3. Open http://${PUBLIC_IP}:5180 and go to Settings > Google to connect OAuth"
 echo ""

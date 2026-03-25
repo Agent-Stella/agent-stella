@@ -28,6 +28,8 @@ services:
       STELLA_DB_HOST: postgres
     volumes:
       - ./stella-data:/app/data
+    ports:
+      - "5180:5180"
     shm_size: '2gb'
     deploy:
       resources:
