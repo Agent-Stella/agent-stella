@@ -78,4 +78,4 @@ Check out the [full command line usage](doc/usage.md) for the complete reference
 
 ## 5. Enjoy!
 
-Enjoy Stella. Give us a star if you like what she does, recommend it to others, and of course don't hesitate asking questions or giving feedback. She will ingest it for our next meetings ;-D
+Enjoy Stella. Give us a star if you like what she does, recommend it to others, and of course don't hesitate asking questions or giving feedback. She will ingest it for our next meetings 😜
