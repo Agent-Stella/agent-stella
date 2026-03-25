@@ -1,7 +1,7 @@
 <table border="0" cellspacing="0" cellpadding="0">
 <tr>
 <td width="50%" align="center" style="border: none;">
-  <img src="doc/stella-in-a-meeting.png" alt="Stella in a meeting" width="400">
+  <img src="doc/stella-in-a-meeting.jpeg" alt="Stella in a meeting" width="400">
 </td>
 <td width="50%" valign="top" style="border: none;">
   <img src="doc/stella.png" alt="Stella" width="250"><br><br>
