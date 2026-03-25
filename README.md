@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="doc/stella.png" alt="Stella" width="300">
+</p>
+
 # Stella — AI Meeting Agent
 
 Stella is an AI meeting agent that joins Google Meet calls as a voice participant. She listens, speaks, and answers questions using a knowledge base — replacing passive notetakers with an active team member.
