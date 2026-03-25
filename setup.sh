@@ -59,10 +59,6 @@ cur_openai_key="$(toml_get openai_api_key)"
 cur_google_email="$(toml_get google_email)"
 cur_google_password="$(toml_get google_password)"
 cur_totp_secret="$(toml_get totp_secret)"
-cur_app_password="$(toml_get app_password)"
-# Extract credentials_file, stripping the container prefix for display.
-cur_credentials_file_raw="$(toml_get credentials_file)"
-cur_credentials_file="${cur_credentials_file_raw#/app/data/}"
 cur_rag_api_key="$(toml_get api_key)"
 cur_db_password="$(toml_get password)"
 
@@ -82,25 +78,21 @@ fi
 
 echo ""
 echo "2. Google Workspace account — required for Meet, Calendar, and Email."
-echo "   Stella needs a dedicated Workspace user with a service account"
-echo "   (domain-wide delegation) and 2FA enabled."
+echo "   Stella needs a dedicated Workspace user. OAuth 2.0 is configured"
+echo "   from the web panel after setup (Settings > Google > Connect)."
 
 google_email=""
 google_password=""
 totp_secret=""
-app_password=""
-credentials_file=""
-calendar_enabled="false"
-email_enabled="false"
 
 echo ""
 prompt google_email "Google email" "$cur_google_email"
-prompt google_password "Google password" "$cur_google_password" true
-prompt totp_secret "TOTP secret (2FA)" "$cur_totp_secret" true
-prompt credentials_file "Service account file (relative to stella-data/)" "${cur_credentials_file:-credentials/sa.json}"
-prompt app_password "App password (IMAP)" "$cur_app_password" true
-calendar_enabled="true"
-email_enabled="true"
+prompt google_password "Google password (Chrome login)" "$cur_google_password" true
+prompt totp_secret "TOTP secret (2FA, optional)" "$cur_totp_secret" true
+
+# Calendar and email are auto-enabled when OAuth is connected via the web panel.
+calendar_enabled="false"
+email_enabled="false"
 
 # ── Generate RAG secrets ─────────────────────────────────────────
 
@@ -137,11 +129,6 @@ if [[ -n "$totp_secret" ]]; then
 totp_secret = "$totp_secret"
 TOML
 fi
-if [[ -n "$app_password" ]]; then
-  cat >> "$CONFIG_FILE" << TOML
-app_password = "$app_password"
-TOML
-fi
 
 cat >> "$CONFIG_FILE" << TOML
 
@@ -168,24 +155,15 @@ retention_days = 30
 debug_addr = "http://127.0.0.1:18800"
 
 # ── Calendar integration ──────────────────────────────────────
+# Auto-enabled when OAuth is connected via the web panel.
 
 [calendar]
 enabled = $calendar_enabled
-TOML
-
-if [[ -n "$credentials_file" ]]; then
-  # Write the container-absolute path (/app/data/ maps to stella-data/ on host).
-  credentials_container_path="/app/data/$credentials_file"
-  cat >> "$CONFIG_FILE" << TOML
-credentials_file = "$credentials_container_path"
-TOML
-fi
-
-cat >> "$CONFIG_FILE" << TOML
 calendar_id = "primary"
 scan_interval = 5
 
 # ── Email scanning ────────────────────────────────────────────
+# Auto-enabled when OAuth is connected via the web panel.
 
 [email]
 enabled = $email_enabled
@@ -220,6 +198,8 @@ sed "s/__DB_PASSWORD__/$db_password/g" "$TPL_DIR/docker-compose.yml" > "$COMPOSE
 echo ""
 echo "All set! Configuration written to stella-data/config/stella.toml"
 echo ""
-echo "Start Stella:"
-echo "  docker compose up --build"
+echo "Next steps:"
+echo "  1. docker compose up --build"
+echo "  2. docker compose exec stella stella web setup"
+echo "  3. Open http://localhost:5180 and go to Settings > Google to connect OAuth"
 echo ""

@@ -7,14 +7,14 @@ Stella is an AI meeting agent that joins Google Meet calls as a voice participan
 - **Docker** and **Docker Compose**
 - An **OpenAI API key** with Realtime API access
 - A **Google Workspace** account dedicated to the agent (basic Gmail is not supported)
-- A **Google Cloud project** with Calendar, Meet, and Drive APIs enabled
-- A **service account** with domain-wide delegation
+- A **Google Cloud project** with Calendar, Meet, Gmail, and Drive APIs enabled
+- An **OAuth 2.0 client ID** (Web application type)
 
-Stella requires Google Workspace because it uses the **Meet REST API** to create meetings, the **Calendar API** to discover and auto-join scheduled meetings, and the **Drive API** to access meeting transcripts shared via email. These APIs require a service account with domain-wide delegation, which is only available in Google Workspace.
+Stella uses OAuth 2.0 for all Google API access. The user creates an OAuth client ID in GCP Console, enters it in Stella's web panel, and connects via a browser-based OAuth flow. No service accounts or domain-wide delegation are needed.
 
-## Google Workspace Setup
+## Google Setup
 
-Follow the [Google Workspace Setup Guide](doc/google-workspace-setup.md) to create the dedicated user, service account, and configure domain-wide delegation.
+Follow the [Google Setup Guide](doc/google-workspace-setup.md) to create the dedicated user, GCP project, and OAuth client ID.
 
 ## Quick Start
 
@@ -56,7 +56,7 @@ Re-run `./setup.sh` any time to change base settings, or use the web interface f
 stella-data/
 ├── config/               # stella.toml configuration
 ├── logs/                 # Stella and Chrome logs
-├── credentials/          # Service account JSON
+├── credentials/          # (reserved for future use)
 ├── chrome-profile/       # Chrome user data (persists login)
 ├── backup/               # Database backups
 ├── postgresql/           # PostgreSQL data
@@ -77,7 +77,7 @@ Logs: `stella-data/logs/`
 |---------|-------|
 | Chrome crashes | Ensure `shm_size: 2gb` in docker-compose.yml |
 | Audio not working | `docker compose exec stella pactl list sinks short` |
-| Calendar not polling | Verify credentials file + google email in Settings |
+| Calendar not polling | Verify OAuth is connected + google email in Settings |
 | Google login fails | Check `stella-data/logs/google-login.log`, verify password + TOTP in Settings |
 | RAG not starting | Check database password in stella.toml; re-run `./setup.sh` |
 | Web UI not accessible | Ensure port 5180 is mapped in docker-compose.yml |

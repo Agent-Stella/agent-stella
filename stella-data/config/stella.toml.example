@@ -16,7 +16,8 @@
 # google_email = "stella@example.com"  # env: GOOGLE_EMAIL
 # google_password = ""              # env: GOOGLE_PASSWORD (Chrome auto-login)
 # totp_secret = ""                  # env: GOOGLE_TOTP_SECRET (2FA authenticator secret)
-# app_password = ""                 # env: GOOGLE_APP_PASSWORD (Gmail IMAP app password)
+# oauth_client_id = ""              # env: GOOGLE_OAUTH_CLIENT_ID
+# oauth_client_secret = ""          # env: GOOGLE_OAUTH_CLIENT_SECRET
 
 # ── Agent identity & behavior ─────────────────────────────────
 
@@ -45,19 +46,18 @@ retention_days = 30                  # Delete rotated logs older than N days
 debug_addr = "http://127.0.0.1:18800"  # env: CHROME_DEBUG_ADDR
 
 # ── Calendar integration ──────────────────────────────────────
-# Requires: basic.google_email + calendar.credentials_file
+# Auto-enabled when OAuth is connected and google_email is set.
 
 [calendar]
-enabled = false                      # Auto-detected from credentials
-# credentials_file = "stella-data/credentials/service-account.json"  # env: GOOGLE_CREDENTIALS_FILE
+enabled = false                      # Auto-detected from OAuth connection
 calendar_id = "primary"              # env: GOOGLE_CALENDAR_ID
 scan_interval = 5                    # env: STELLA_CALENDAR_INTERVAL (minutes)
 
 # ── Email scanning ────────────────────────────────────────────
-# Requires: basic.google_email + basic.app_password
+# Auto-enabled when OAuth is connected and google_email is set.
 
 [email]
-enabled = false                      # Auto-detected from credentials
+enabled = false                      # Auto-detected from OAuth connection
 scan_interval = 10                   # env: STELLA_EMAIL_INTERVAL (minutes)
 keywords = ["notes", "transcript", "meeting", "summary", "recording"]
                                      # env: STELLA_EMAIL_KEYWORDS (comma-separated)

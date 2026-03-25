@@ -441,14 +441,15 @@ stella email check
 Performs a one-shot scan for meeting-related emails. This is the same scan the daemon runs automatically every 10 minutes.
 
 **How it works:**
-1. Connects to Gmail via IMAP using the configured app password.
-2. Searches for emails with subject keywords: `notes`, `transcript`, `meeting`, `summary`, `recording`.
+1. Connects to Gmail via the Gmail API using OAuth 2.0.
+2. Searches for unread emails with subject keywords: `notes`, `transcript`, `meeting`, `summary`, `recording`.
 3. Extracts Google Docs links from matching emails.
 4. Fetches document content via the Google Drive API.
 5. Ingests the content into the RAG knowledge base.
 6. Deduplicates — the same document is never ingested twice.
+7. When the same document later appears in a calendar event, it is linked to the meeting automatically.
 
-**This is how Stella builds memory automatically.** When a meeting notetaker (Otter.ai, Fireflies, Google Meet) emails a transcript to Stella's Google account, it's automatically ingested. In the next meeting, Stella can reference what was discussed.
+**This is how Stella builds memory automatically.** When a meeting notetaker (Gemini, Otter.ai, Fireflies) emails notes to Stella's Google account, they're ingested immediately. After the meeting ends, Stella also polls the calendar event for up to 1 hour to find linked notes/transcripts and associate them with the correct meeting record.
 
 **Configuration** (in `stella.toml`):
 
@@ -460,8 +461,7 @@ senders = []                         # Optional: filter by sender email
 ```
 
 **Requirements:**
-- `basic.google_email` — the Google account to scan
-- `basic.app_password` — an app password for IMAP access
+- Google OAuth must be connected (Settings > Google > Connect Google Account)
 
 ---
 
@@ -584,7 +584,8 @@ openai_api_key = ""
 google_email = ""
 google_password = ""
 totp_secret = ""
-app_password = ""
+oauth_client_id = ""
+oauth_client_secret = ""
 ```
 
 | Env Variable | Setting |
@@ -593,24 +594,23 @@ app_password = ""
 | `GOOGLE_EMAIL` | `basic.google_email` |
 | `GOOGLE_PASSWORD` | `basic.google_password` |
 | `GOOGLE_TOTP_SECRET` | `basic.totp_secret` |
-| `GOOGLE_APP_PASSWORD` | `basic.app_password` |
+| `GOOGLE_OAUTH_CLIENT_ID` | `basic.oauth_client_id` |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | `basic.oauth_client_secret` |
 
 ### Calendar
 
 ```toml
 [calendar]
-credentials_file = ""       # Path to service account JSON
 calendar_id = "primary"
 scan_interval = 5            # Minutes between scans
 ```
 
 | Env Variable | Setting |
 |---|---|
-| `GOOGLE_CREDENTIALS_FILE` | `calendar.credentials_file` |
 | `GOOGLE_CALENDAR_ID` | `calendar.calendar_id` |
 | `STELLA_CALENDAR_INTERVAL` | `calendar.scan_interval` |
 
-Calendar is auto-enabled when both `credentials_file` and `google_email` are configured.
+Calendar is auto-enabled when OAuth is connected and `google_email` is configured.
 
 ### Email
 
@@ -627,7 +627,7 @@ senders = []
 | `STELLA_EMAIL_KEYWORDS` | `email.keywords` (comma-separated) |
 | `STELLA_EMAIL_SENDERS` | `email.senders` (comma-separated) |
 
-Email is auto-enabled when both `google_email` and `app_password` are configured.
+Email is auto-enabled when OAuth is connected and `google_email` is configured.
 
 ### RAG & Database
 
