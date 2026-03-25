@@ -1,12 +1,11 @@
-<table>
+<table border="0" cellspacing="0" cellpadding="0">
 <tr>
-<td width="50%" align="center">
-  <img src="doc/stella.png" alt="Stella" width="280"><br><br>
-  <img src="doc/stella-in-a-meeting.png" alt="Stella in a meeting" width="380">
+<td width="50%" align="center" style="border: none;">
+  <img src="doc/stella-in-a-meeting.png" alt="Stella in a meeting" width="400">
 </td>
-<td width="50%">
-  <h1>AI Meeting Agent</h1>
-  <p>Stella is an AI meeting agent that joins Google Meet calls as a voice participant. She listens, speaks, and answers questions using a knowledge base — replacing passive notetakers with an active team member.</p>
+<td width="50%" valign="top" style="border: none;">
+  <img src="doc/stella.png" alt="Stella" width="250"><br><br>
+  Stella is an AI meeting agent that joins Google Meet calls as a voice participant. She listens, speaks, and answers questions using a knowledge base — replacing passive notetakers with an active team member.
 </td>
 </tr>
 </table>
