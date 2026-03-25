@@ -12,7 +12,7 @@ To make Stella work you'll need the next ingredients:
 
 Not too complicated, but we know that GCP is not the friendliest of platforms so we prepared a step-by-step guide to help you get everything in place. Head over to the [Setup Guide](doc/google-workspace-setup.md) and follow along.
 
-**Stop here until you have all the elements from this step.**
+> **>>> Stop here until you have all the elements from this step. <<<**
 
 ## 2. First Time Run
 
