@@ -1,10 +1,15 @@
-<p align="center">
-  <img src="doc/stella.png" alt="Stella" width="300">
-</p>
-
-# Stella — AI Meeting Agent
-
-Stella is an AI meeting agent that joins Google Meet calls as a voice participant. She listens, speaks, and answers questions using a knowledge base — replacing passive notetakers with an active team member.
+<table>
+<tr>
+<td width="50%" align="center">
+  <img src="doc/stella.png" alt="Stella" width="280"><br><br>
+  <img src="doc/stella-in-a-meeting.png" alt="Stella in a meeting" width="380">
+</td>
+<td width="50%">
+  <h1>AI Meeting Agent</h1>
+  <p>Stella is an AI meeting agent that joins Google Meet calls as a voice participant. She listens, speaks, and answers questions using a knowledge base — replacing passive notetakers with an active team member.</p>
+</td>
+</tr>
+</table>
 
 ## 1. Prerequisites
 
