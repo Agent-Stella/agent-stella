@@ -1,63 +1,95 @@
-# Google Setup
+# Setup Guide
 
-This guide walks through setting up Google integration for Stella. Return to the [main README](../README.md) when done.
+Stella lives in the Google ecosystem. Like it or not, that's how she does. So if you want Stella in your meetings then you need to prepare her a few things.
 
-## 1. Create a dedicated Google Workspace user
+Not too complicated, just do these steps and you should be done in a few minutes.
 
-In **Google Workspace Admin** ([admin.google.com](https://admin.google.com)) > Directory > Users, create a user for the agent (e.g., `stella@yourdomain.com`).
+Return to the [main README](../README.md) when done.
 
-## 2. Create a GCP project and enable APIs
+---
 
-In **Google Cloud Console** ([console.cloud.google.com](https://console.cloud.google.com)):
+## 1. The OpenAI API Key
 
-1. Create a new project (or use an existing one).
-2. Go to **APIs & Services > Library** and enable:
+Stella speaks with an OpenAI voice. It would be nice to have other options? YES, but she speaks OpenAI for now. So let's go get an API key:
+
+1. Log in to [platform.openai.com](https://platform.openai.com)
+2. Go to your settings, find the **Billing** section (usually [here](https://platform.openai.com/settings/organization/billing/overview))
+3. Add a payment method
+4. Go to your default project, find the **API keys** section
+5. Create an API key. Note it for later.
+
+Done!
+
+---
+
+## 2. The Google Workspace User
+
+Yes, Stella needs a Google Workspace user. Basic Gmail access won't work because it lacks important functionalities that Stella needs (like managing transcripts), and also the OAuth Client that we'll prepare in the next section needs to be in the same domain as the Stella user. This is so we don't have to make the OAuth gateway public, which involves Google reviewing it and takes long to approve.
+
+> **Note:** The bot's email address needs to be in the same domain as the OAuth client. Otherwise you'll have to publish the OAuth client as open and go through Google review and acceptance, which may take hours or days.
+
+So let's create a Google Workspace user for Stella:
+
+1. Go to [admin.google.com](https://admin.google.com)
+2. Go into **Directory > Users**
+3. Create a user for Stella (e.g., `stella@yourdomain.com`)
+4. Note the email and the password for later
+
+Done! (one less step...)
+
+---
+
+## 3. Google Cloud, the Ugly Monster
+
+Google Cloud is a beast. Don't worry if you are not familiar with it. Just follow these steps and you'll be done in 3 minutes.
+
+### Enable the APIs
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project (**IAM & Admin > Create a project**), or use an existing one
+3. Go to **APIs & Services > Library** and enable:
    - Google Calendar API
    - Google Meet REST API
    - Gmail API
    - Google Drive API
 
-## 3. Configure the OAuth consent screen
+### Create the OAuth Consent Screen
 
-Still in **Google Cloud Console**:
-
-1. Go to **APIs & Services > OAuth consent screen**.
+1. Go to **APIs & Services > OAuth consent screen**
 2. Choose **Internal** (for Google Workspace) — this means only users in your organization can authorize. No Google app verification needed.
-3. Fill in the app name (e.g., "Stella") and your email as the support contact.
-4. No scopes need to be added manually — they are requested at authorization time.
-5. Click **Save**.
+3. Fill in the app name (e.g., "Stella") and your email as the support contact
+4. No scopes need to be added
+5. Click **Save**
 
-## 4. Create an OAuth client ID
+### Create the OAuth Client ID
 
-1. Go to **APIs & Services > Credentials**.
-2. Click **Create Credentials > OAuth client ID**.
-3. Choose **Web application** as the application type.
+1. Go to **APIs & Services > Credentials**
+2. Click **Create Credentials > OAuth client ID**
+3. Choose **Web application** as the application type
 4. Under **Authorized redirect URIs**, add:
    ```
    http://localhost:5180/auth/google/callback
    ```
-   If Stella is behind a reverse proxy with a domain, also add:
+   Or, if Stella is hosted on a public IP or the server has a name:
    ```
-   https://stella.yourdomain.com/auth/google/callback
+   http://<server-ip-or-name>:5180/auth/google/callback
    ```
-5. Click **Create** and note the **Client ID** and **Client Secret**.
+5. Click **Create** and note the **Client ID** and **Client Secret** for later
 
-## 5. Connect Stella
+---
 
-1. Open the Stella web panel (default: `http://localhost:5180`).
-2. Go to **Settings > Google > Edit**.
-3. Enter the **OAuth Client ID** and **OAuth Client Secret**.
-4. Enter the Google email of the Stella user (e.g., `stella@yourdomain.com`) and its password for Chrome auto-login.
-5. Click **Save**, then click **Connect Google Account**.
-6. You will be redirected to Google's consent screen. Log in with the Stella Google account and grant the requested permissions.
-7. Once redirected back to Stella, the Google Account status should show **Connected**.
+## ALL DONE!!
 
-## 6. (Optional) Enable 2FA for Chrome login
+Yes, no jokes, all done. Pain is over.
 
-If you want to add 2FA security to the Stella Google account:
+### Recap
 
-1. Sign in as the Stella user and enable **2-Step Verification** at [myaccount.google.com/signinoptions/two-step-verification](https://myaccount.google.com/signinoptions/two-step-verification).
-2. Choose the **Authenticator app** option and save the TOTP secret.
-3. Enter the TOTP secret in Stella's Google settings (Settings > Google > Edit > TOTP Secret).
+If you did everything right you should now have:
 
-This is entirely optional. Without 2FA, Stella will log in with just email + password.
+- An **OpenAI API key**
+- A **Google user** (email + password)
+- An **OAuth Client ID** + **Client Secret**
+
+If you have all of these then head back to the [README](../README.md#2-first-time-run) to start Stella and finish the setup from her web interface (easy and painless).
+
+If you are missing any of these then don't worry, just breathe and start over :sweat_smile:
