@@ -56,22 +56,41 @@ echo ""
 # ── Load existing defaults ───────────────────────────────────────
 
 cur_openai_key="$(toml_get openai_api_key)"
+cur_gemini_key="$(toml_get gemini_api_key)"
+cur_realtime_backend="$(toml_get realtime_backend)"
 cur_google_email="$(toml_get google_email)"
 cur_google_password="$(toml_get google_password)"
 cur_totp_secret="$(toml_get totp_secret)"
 cur_rag_api_key="$(toml_get api_key)"
 cur_db_password="$(toml_get password)"
 
-# ── 1. OpenAI API Key ───────────────────────────────────────────
+# ── 1. Realtime Backend & API Keys ──────────────────────────────
 
-echo "1. OpenAI is used for realtime voice and the knowledge base (RAG embeddings)."
-echo "   Provide an OpenAI API key that supports both."
+echo "1. Stella supports OpenAI Realtime and Gemini Live for voice."
+echo "   Choose your realtime backend. All features (voice, embeddings, TTS)"
+echo "   will use the selected provider."
 echo ""
-prompt openai_key "OpenAI API Key (required)" "$cur_openai_key" true
+prompt realtime_backend "Realtime backend (openai/gemini)" "${cur_realtime_backend:-openai}"
 
-if [[ -z "$openai_key" ]]; then
-  echo "Error: OpenAI API key is required."
-  exit 1
+openai_key=""
+gemini_key=""
+
+if [[ "$realtime_backend" == "gemini" ]]; then
+  echo ""
+  echo "   Gemini API key is used for voice, embeddings, and all AI features."
+  prompt gemini_key "Gemini API Key (required)" "$cur_gemini_key" true
+  if [[ -z "$gemini_key" ]]; then
+    echo "Error: Gemini API key is required when backend is gemini."
+    exit 1
+  fi
+else
+  echo ""
+  echo "   OpenAI API key is used for voice, embeddings, and all AI features."
+  prompt openai_key "OpenAI API Key (required)" "$cur_openai_key" true
+  if [[ -z "$openai_key" ]]; then
+    echo "Error: OpenAI API key is required when backend is openai."
+    exit 1
+  fi
 fi
 
 # ── 2. Google Workspace account ───────────────────────────────
@@ -111,8 +130,18 @@ cat > "$CONFIG_FILE" << TOML
 # ── Core credentials ──────────────────────────────────────────
 
 [basic]
+TOML
+
+if [[ -n "$openai_key" ]]; then
+  cat >> "$CONFIG_FILE" << TOML
 openai_api_key = "$openai_key"
 TOML
+fi
+if [[ -n "$gemini_key" ]]; then
+  cat >> "$CONFIG_FILE" << TOML
+gemini_api_key = "$gemini_key"
+TOML
+fi
 
 if [[ -n "$google_email" ]]; then
   cat >> "$CONFIG_FILE" << TOML
@@ -138,6 +167,7 @@ cat >> "$CONFIG_FILE" << TOML
 name = "Stella"
 default_voice = "coral"
 default_lang = "English"
+realtime_backend = "$realtime_backend"
 listen_only = false
 enable_notes = true
 auto_accept_guests = true
