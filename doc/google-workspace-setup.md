@@ -8,15 +8,23 @@ Return to the [main README](../README.md) when done.
 
 ---
 
-## 1. The OpenAI API Key
+## 1. The Voice Backend API Key
 
-Stella speaks with an OpenAI voice. It would be nice to have other options? YES, but she speaks OpenAI for now. So let's go get an API key:
+Stella supports two voice backends: **OpenAI Realtime** and **Google Gemini Live**. You only need one — pick whichever you prefer.
+
+### Option A: OpenAI
 
 1. Log in to [platform.openai.com](https://platform.openai.com)
 2. Go to your settings, find the **Billing** section (usually [here](https://platform.openai.com/settings/organization/billing/overview))
 3. Add a payment method
 4. Go to your default project, find the **API keys** section
 5. Create an API key. Note it for later.
+
+### Option B: Gemini
+
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Create an API key (or use an existing one)
+3. Note it for later.
 
 Done!
 
@@ -86,7 +94,7 @@ Yes, no jokes, all done. Pain is over.
 
 If you did everything right you should now have:
 
-- An **OpenAI API key**
+- An **OpenAI API key** or a **Gemini API key** (one of the two)
 - A **Google user** (email + password)
 - An **OAuth Client ID** + **Client Secret**
 

@@ -14,7 +14,7 @@
 
 To make Stella work you'll need the next ingredients:
 
-- An **OpenAI API key** with Realtime API access
+- An **OpenAI API key** with Realtime API access, or a **Google Gemini API key** — your choice of voice backend
 - A **Google Workspace** account dedicated to the agent (basic Gmail won't work)
 - A **Google Cloud project** with some APIs enabled and an OAuth Client
 
@@ -29,6 +29,11 @@ Now that you have all the ingredients, let's start Stella so you can fill in all
 ```bash
 git clone https://github.com/Agent-Stella/agent-stella.git
 cd agent-stella
+
+# Run the setup wizard — it will ask for your API keys, Google credentials,
+# and your choice of voice backend (OpenAI or Gemini).
+# This generates stella.toml and docker-compose.yml.
+./setup.sh
 
 # Create an admin user for the web interface
 docker compose run --rm stella stella web setup
