@@ -49,11 +49,14 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
 WORKDIR /app
 
-# Install Tesseract OCR (for image-only PDFs) and Python parsing dependencies
+# Install Tesseract OCR (for image-only PDFs) and Python parsing dependencies.
+# openwakeword pulls in onnxruntime + numpy for the hybrid-mode wake detector;
+# the bundled "hey_jarvis" model auto-downloads on first run and is cached.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pip tesseract-ocr tesseract-ocr-eng \
     && pip3 install --no-cache-dir --break-system-packages \
        pymupdf pymupdf4llm python-docx python-pptx trafilatura pytesseract Pillow \
+       openwakeword \
     && apt-get purge -y python3-pip && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
@@ -61,8 +64,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG TARGETARCH
 COPY bin/stella-linux-${TARGETARCH} /usr/local/bin/stella
 
-# Copy Python document parser
+# Copy Python document parser and wake-word sidecar
 COPY parse/stella_parse.py /app/parse.py
+COPY parse/stella_wake.py /app/wake.py
 
 # Copy entrypoint script
 COPY start-chrome.sh /app/start-chrome.sh
