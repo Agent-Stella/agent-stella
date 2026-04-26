@@ -50,13 +50,17 @@ ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 WORKDIR /app
 
 # Install Tesseract OCR (for image-only PDFs) and Python parsing dependencies.
-# openwakeword pulls in onnxruntime + numpy for the hybrid-mode wake detector;
-# the bundled "hey_jarvis" model auto-downloads on first run and is cached.
+# openwakeword pulls in onnxruntime + numpy for the hybrid-mode wake detector.
+# The pip package contains the library code but not the ONNX model files;
+# download_models() pulls them at build time so /app/wake.py works offline
+# when the container starts. ~10 MB total (hey_jarvis, alexa, hey_mycroft,
+# hey_rhasspy, plus the shared melspec/embedding feature extractors).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pip tesseract-ocr tesseract-ocr-eng \
     && pip3 install --no-cache-dir --break-system-packages \
        pymupdf pymupdf4llm python-docx python-pptx trafilatura pytesseract Pillow \
        openwakeword \
+    && python3 -c "from openwakeword.utils import download_models; download_models()" \
     && apt-get purge -y python3-pip && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
