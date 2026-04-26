@@ -15,12 +15,28 @@ filesystem paths to .onnx/.tflite custom models. Mixed lists are allowed.
 import argparse
 import os
 import sys
+import time
 import traceback
 
 
 def emit(line: str) -> None:
     sys.stdout.write(line + "\n")
     sys.stdout.flush()
+
+
+def emit_stats(predicts: int, total_predict_ms: float, window_s: float) -> None:
+    """Periodic throughput summary on stderr.
+
+    The Go side forwards stderr to the meeting log, so this surfaces inside
+    the same log stream as bus drop warnings — making it easy to correlate
+    'subscriber falling behind' with actual sidecar processing latency.
+    """
+    avg = total_predict_ms / predicts if predicts else 0.0
+    sys.stderr.write(
+        f"[stats] predicts={predicts} avg_predict_ms={avg:.1f} "
+        f"window_s={window_s:.1f} eff_fps={predicts / window_s:.1f}\n"
+    )
+    sys.stderr.flush()
 
 
 def main() -> int:
@@ -88,6 +104,11 @@ def main() -> int:
     threshold = args.threshold
     frame_bytes = args.frame_bytes
 
+    predict_count = 0
+    predict_total_ms = 0.0
+    stats_window_start = time.monotonic()
+    stats_interval_s = 10.0
+
     while True:
         chunk = stdin.read(frame_bytes)
         if not chunk:
@@ -99,7 +120,10 @@ def main() -> int:
 
         try:
             audio = np.frombuffer(chunk, dtype=np.int16)
+            t0 = time.monotonic()
             preds = model.predict(audio)
+            predict_total_ms += (time.monotonic() - t0) * 1000.0
+            predict_count += 1
         except Exception as exc:
             emit(f"ERROR predict failed: {exc}")
             sys.stderr.write(traceback.format_exc())
@@ -112,6 +136,13 @@ def main() -> int:
                 continue
             if s >= threshold:
                 emit(f"WAKE {name} {s:.4f}")
+
+        now = time.monotonic()
+        if now - stats_window_start >= stats_interval_s:
+            emit_stats(predict_count, predict_total_ms, now - stats_window_start)
+            predict_count = 0
+            predict_total_ms = 0.0
+            stats_window_start = now
 
     return 0
 
