@@ -53,6 +53,13 @@ def main() -> int:
         help="confidence threshold (0..1) — emit WAKE only when score >= threshold",
     )
     parser.add_argument(
+        "--near-miss-threshold",
+        type=float,
+        default=0.2,
+        help="log scores >= this on stderr even when below the WAKE threshold; useful "
+             "for diagnosing why a wake word isn't firing (set 0 to disable)",
+    )
+    parser.add_argument(
         "--frame-bytes",
         type=int,
         default=3200,
@@ -102,12 +109,19 @@ def main() -> int:
 
     stdin = sys.stdin.buffer
     threshold = args.threshold
+    near_miss_threshold = args.near_miss_threshold
     frame_bytes = args.frame_bytes
 
     predict_count = 0
     predict_total_ms = 0.0
     stats_window_start = time.monotonic()
     stats_interval_s = 10.0
+
+    # Per-model running max score in the current stats window, so periodic
+    # stats lines also surface "highest the model came to firing this window"
+    # — handy when no individual frame crosses the near-miss threshold but
+    # the model is consistently warm.
+    window_max: dict[str, float] = {}
 
     while True:
         chunk = stdin.read(frame_bytes)
@@ -134,14 +148,29 @@ def main() -> int:
                 s = float(score)
             except (TypeError, ValueError):
                 continue
+            if s > window_max.get(name, 0.0):
+                window_max[name] = s
             if s >= threshold:
                 emit(f"WAKE {name} {s:.4f}")
+            elif near_miss_threshold > 0 and s >= near_miss_threshold:
+                # Surface near-misses on stderr so the parent log shows
+                # "the model almost fired" — useful for tuning the
+                # threshold for the user's voice/accent/mic.
+                sys.stderr.write(
+                    f"[near-miss] {name} score={s:.3f} (threshold={threshold:.2f})\n"
+                )
+                sys.stderr.flush()
 
         now = time.monotonic()
         if now - stats_window_start >= stats_interval_s:
             emit_stats(predict_count, predict_total_ms, now - stats_window_start)
+            if window_max:
+                summary = " ".join(f"{n}={v:.2f}" for n, v in sorted(window_max.items()))
+                sys.stderr.write(f"[stats] window_max {summary}\n")
+                sys.stderr.flush()
             predict_count = 0
             predict_total_ms = 0.0
+            window_max = {}
             stats_window_start = now
 
     return 0
