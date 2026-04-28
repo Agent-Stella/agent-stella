@@ -1,100 +1,193 @@
 # ─────────────────────────────────────────────────────────────
 # Stella Configuration
 # ─────────────────────────────────────────────────────────────
-# All values can be overridden by environment variables.
-# The mapping is shown in comments next to each field.
+# All values can be overridden by environment variables. The mapping is
+# shown in comments next to each field.
 #
 # Config file search order:
 #   1. $STELLA_CONFIG (path to file)
 #   2. ./stella-data/config/stella.toml
 #   3. ./stella.toml
+#
+# Defaults shown match what the binary uses when a key is unset. Most users
+# only need to fill in [basic] credentials and any [agent].mode-specific
+# blocks (e.g. [wake] / [deepgram] for hybrid mode).
 
 # ── Core credentials ──────────────────────────────────────────
 
 [basic]
-# Provide the key for your chosen backend (openai or gemini).
-# openai_api_key = "sk-..."        # env: OPENAI_API_KEY (required when backend=openai)
-# gemini_api_key = ""               # env: GEMINI_API_KEY (required when backend=gemini)
-# google_email = "stella@example.com"  # env: GOOGLE_EMAIL
-# google_password = ""              # env: GOOGLE_PASSWORD (Chrome auto-login)
-# totp_secret = ""                  # env: GOOGLE_TOTP_SECRET (2FA authenticator secret)
-# oauth_client_id = ""              # env: GOOGLE_OAUTH_CLIENT_ID
-# oauth_client_secret = ""          # env: GOOGLE_OAUTH_CLIENT_SECRET
+# Provide the key for your chosen realtime backend (openai or gemini).
+# openai_api_key = "sk-..."           # env: OPENAI_API_KEY (required when realtime_backend=openai)
+# gemini_api_key = ""                 # env: GEMINI_API_KEY (required when realtime_backend=gemini)
+# google_email = "stella@example.com" # env: GOOGLE_EMAIL
+# google_password = ""                # env: GOOGLE_PASSWORD (Chrome auto-login)
+# totp_secret = ""                    # env: GOOGLE_TOTP_SECRET (2FA authenticator secret)
+# oauth_client_id = ""                # env: GOOGLE_OAUTH_CLIENT_ID
+# oauth_client_secret = ""            # env: GOOGLE_OAUTH_CLIENT_SECRET
 
-# ── Agent identity & behavior ─────────────────────────────────
+# ── Agent identity & behaviour ────────────────────────────────
 
 [agent]
-name = "Stella"                     # env: STELLA_AGENT_NAME
-default_voice = "coral"             # env: STELLA_DEFAULT_VOICE
-                                    #   Options: alloy, ash, ballad, coral, echo, sage, shimmer, verse
-default_lang = "English"             # env: STELLA_DEFAULT_LANG
-realtime_backend = "openai"         # env: STELLA_REALTIME_BACKEND
-                                    #   Options: openai, gemini
-listen_only = false                 # env: STELLA_LISTEN_ONLY
-                                    #   When true, only responds when addressed by name
-enable_notes = true                 # env: STELLA_ENABLE_NOTES
-                                    #   Activate Gemini notes/transcription when joining
-auto_accept_guests = true           # env: STELLA_AUTO_ACCEPT_GUESTS
-                                    #   Auto-admit waiting guests (when agent is host)
+name = "Stella"                       # env: STELLA_AGENT_NAME
+default_voice = "coral"               # env: STELLA_DEFAULT_VOICE
+                                      #   Options: alloy, ash, ballad, coral, echo, sage, shimmer, verse
+default_lang = "English"              # env: STELLA_DEFAULT_LANG
+realtime_backend = "openai"           # env: STELLA_REALTIME_BACKEND
+                                      #   Options: openai, gemini
+
+# Mode picks the meeting-level audio architecture:
+#   "legacy" — always-on realtime audio session for the entire meeting
+#              (high cost; works without [wake] or [deepgram]).
+#   "hybrid" — Porcupine-style wake word + Deepgram transcription +
+#              on-demand realtime sessions only when addressed.
+#              Requires [wake] and [deepgram] to be configured.
+mode = "legacy"                       # env: STELLA_AGENT_MODE
+
+listen_only = false                   # env: STELLA_LISTEN_ONLY
+                                      #   When true, only respond when addressed by name.
+enable_notes = true                   # env: STELLA_ENABLE_NOTES
+                                      #   Activate Gemini notes/transcription on join.
+auto_accept_guests = true             # env: STELLA_AUTO_ACCEPT_GUESTS
+                                      #   Auto-admit waiting guests (when agent is host).
+# system_instructions = ""            # env: STELLA_SYSTEM_INSTRUCTIONS
+                                      #   Optional extra persona instructions appended to the
+                                      #   base system prompt every meeting.
+
+# ── Hybrid-mode session lifecycle (used when mode = "hybrid") ──
+# Each on-demand realtime session is governed by these timers:
+#   silence_time          — close after N s of inbound silence (post-activity)
+#   live_startup_grace_sec — pre-first-event grace; silence rule doesn't apply
+#                            until the backend has produced its first event
+#   live_max_sec          — per-segment cap; resets on each fresh wake-word
+#                            fire while the session is Active
+#   live_absolute_max_sec — absolute ceiling; never reset, hard cap
+#   replay_sec            — audio buffer replayed at session open so the
+#                            backend "hears" the wake utterance
+#   transcript_window_min — recent diarized transcript injected into prompt
+extend_mode = "silence"               # env: STELLA_EXTEND_MODE
+                                      #   Options: "silence" (default), "self-extend".
+                                      #   self-extend exposes extend_session/end_session tools
+                                      #   to the realtime model so it can manage its own
+                                      #   lifecycle. See stella-data/config/tpl/self_extend.md
+                                      #   to tune the prompt for that mode.
+silence_time = 10                     # env: STELLA_SILENCE_TIME
+live_startup_grace_sec = 20
+live_max_sec = 90
+live_absolute_max_sec = 600
+replay_sec = 3
+transcript_window_min = 10
+
+# ── Wake-word detection (hybrid mode) ─────────────────────────
+# Required when [agent].mode = "hybrid".
+
+[wake]
+backend = "openwakeword"              # env: STELLA_WAKE_BACKEND
+                                      #   Options: openwakeword
+models = ["hey_jarvis"]               # env: STELLA_WAKE_MODELS (comma-separated)
+                                      #   Bundled openwakeword names ("hey_jarvis", "alexa",
+                                      #   "hey_mycroft", "hey_rhasspy") and/or absolute paths
+                                      #   to custom .onnx / .tflite files. Mixed lists allowed.
+                                      #   Example with custom Stella model:
+                                      #     models = ["/app/data/wake/hey_stella.onnx"]
+threshold = 0.5                       # env: STELLA_WAKE_THRESHOLD
+                                      #   0..1; lower = more sensitive (more false positives).
+                                      #   Tune from [near-miss] log lines.
+near_miss_threshold = 0.2             # env: STELLA_WAKE_NEAR_MISS_THRESHOLD
+                                      #   Log scores ≥ this even when below threshold, so
+                                      #   you can see how close a non-firing utterance came.
+                                      #   Set 0 to disable near-miss logs.
+cooldown_sec = 8                      # env: STELLA_WAKE_COOLDOWN_SEC
+                                      #   Suppress duplicate wake fires within this window.
+
+# ── Deepgram streaming transcription (hybrid mode) ────────────
+# Required when [agent].mode = "hybrid". Builds the diarized rolling
+# transcript that gets injected into each realtime activation's prompt.
+
+[deepgram]
+# api_key = ""                        # env: STELLA_DEEPGRAM_API_KEY (required for hybrid)
+model = "nova-2"                      # env: STELLA_DEEPGRAM_MODEL
+language = "multi"                    # env: STELLA_DEEPGRAM_LANGUAGE
+                                      #   "" (auto) | "en" | "es" | "multi" | etc.
+# Circuit breaker — halts transcription if reconnects loop or accumulate
+# excessively. Tripped breaker sets the meeting's transcription_degraded
+# stat field but keeps the meeting running (Stella loses transcript context).
+breaker_window_sec = 60               # env: STELLA_DEEPGRAM_BREAKER_WINDOW_SEC
+breaker_max_in_window = 5             # env: STELLA_DEEPGRAM_BREAKER_MAX_IN_WINDOW
+breaker_max_total = 20                # env: STELLA_DEEPGRAM_BREAKER_MAX_TOTAL
 
 # ── Logging ───────────────────────────────────────────────────
 
 [logs]
-# dir = "stella-data/logs"          # env: STELLA_LOG_DIR
-rotate_time = "00:00"               # Daily rotation time (HH:MM, 24h format)
-retention_days = 30                  # Delete rotated logs older than N days
+# dir = "stella-data/logs"            # env: STELLA_LOG_DIR
+rotate_time = "00:00"                 # Daily rotation time (HH:MM, 24h).
+retention_days = 30                   # Delete rotated logs older than N days.
 
 # ── Chrome / CDP ──────────────────────────────────────────────
 
 [chrome]
-debug_addr = "http://127.0.0.1:18800"  # env: CHROME_DEBUG_ADDR
+debug_addr = "http://127.0.0.1:18800" # env: CHROME_DEBUG_ADDR
 
 # ── Calendar integration ──────────────────────────────────────
 # Auto-enabled when OAuth is connected and google_email is set.
 
 [calendar]
-enabled = false                      # Auto-detected from OAuth connection
-calendar_id = "primary"              # env: GOOGLE_CALENDAR_ID
-scan_interval = 5                    # env: STELLA_CALENDAR_INTERVAL (minutes)
+enabled = false                       # Auto-detected from OAuth connection.
+calendar_id = "primary"               # env: GOOGLE_CALENDAR_ID
+scan_interval = 5                     # env: STELLA_CALENDAR_INTERVAL (minutes)
 
 # ── Email scanning ────────────────────────────────────────────
 # Auto-enabled when OAuth is connected and google_email is set.
 
 [email]
-enabled = false                      # Auto-detected from OAuth connection
-scan_interval = 10                   # env: STELLA_EMAIL_INTERVAL (minutes)
+enabled = false                       # Auto-detected from OAuth connection.
+scan_interval = 10                    # env: STELLA_EMAIL_INTERVAL (minutes)
 keywords = ["notes", "transcript", "meeting", "summary", "recording"]
-                                     # env: STELLA_EMAIL_KEYWORDS (comma-separated)
+                                      # env: STELLA_EMAIL_KEYWORDS (comma-separated)
 # senders = ["notifications@otter.ai", "notifications@fireflies.ai", "meet-recordings-noreply@google.com"]
-                                     # env: STELLA_EMAIL_SENDERS (comma-separated)
+                                      # env: STELLA_EMAIL_SENDERS (comma-separated)
 
 # ── Owner notifications ───────────────────────────────────────
 
 [owner]
-# name = "Your Name"                # env: AGENT_OWNER_NAME
-# email = "you@example.com"         # env: AGENT_OWNER_EMAIL
-                                     #   If set, enables email notifications about new meetings
+# name = "Your Name"                  # env: AGENT_OWNER_NAME
+# email = "you@example.com"           # env: AGENT_OWNER_EMAIL
+                                      #   If set, enables email notifications about new meetings.
 
-# ── RAG (knowledge base) ─────────────────────────────────────
+# ── RAG (knowledge base) ──────────────────────────────────────
 # RAG is always active. A database password is required.
 
 [rag]
-url = "http://localhost:8080"        # env: STELLA_RAG_URL
-# api_key = ""                       # env: STELLA_RAG_KEY
-
-# ── RAG database ─────────────────────────────────────────────
+url = "http://localhost:8080"         # env: STELLA_RAG_URL
+# api_key = ""                        # env: STELLA_RAG_KEY
 
 [rag.database]
-host = "localhost"                   # env: STELLA_DB_HOST
-port = 5432                          # env: STELLA_DB_PORT
-name = "stella"                      # env: STELLA_DB_NAME
-user = "stella"                      # env: STELLA_DB_USER
-# password = ""                      # env: STELLA_DB_PASSWORD (required)
-
-# ── RAG backup ────────────────────────────────────────────────
+host = "localhost"                    # env: STELLA_DB_HOST
+port = 5432                           # env: STELLA_DB_PORT
+name = "stella"                       # env: STELLA_DB_NAME
+user = "stella"                       # env: STELLA_DB_USER
+# password = ""                       # env: STELLA_DB_PASSWORD (required)
 
 [rag.backup]
-mode = "off"                         # "off", "daily", "weekly", "monthly", "auto"
-time = "03:00"                       # Backup time (HH:MM, 24h format)
-retention = 7                        # Keep N most recent backups
-dir = "stella-data/backup"           # Backup directory
+mode = "off"                          # "off", "daily", "weekly", "monthly", "auto"
+time = "03:00"                        # Backup time (HH:MM, 24h format)
+retention = 7                         # Keep N most recent backups
+dir = "stella-data/backup"            # Backup directory
+
+[rag.embedding]
+model = "text-embedding-3-small"      # OpenAI / Gemini embedding model name
+dimensions = 1536                     # Vector dimensions (must match column type)
+batch_size = 100                      # Documents per embedding API call
+
+[rag.chunking]
+chunk_size = 512                      # Target tokens per chunk
+overlap = 50                          # Tokens of overlap between adjacent chunks
+
+[rag.search]
+match_count = 10                      # Top-K results returned per query
+semantic_weight = 1.0                 # Weight of vector similarity in hybrid score
+full_text_weight = 1.0                # Weight of full-text BM25 in hybrid score
+
+# ── Web management UI ────────────────────────────────────────
+
+[web]
+port = "5180"                         # HTTP port for the embedded HTMX UI
