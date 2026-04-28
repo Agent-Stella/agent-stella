@@ -83,12 +83,17 @@ transcript_window_min = 10
 [wake]
 backend = "openwakeword"              # env: STELLA_WAKE_BACKEND
                                       #   Options: openwakeword
-models = ["hey_jarvis"]               # env: STELLA_WAKE_MODELS (comma-separated)
-                                      #   Bundled openwakeword names ("hey_jarvis", "alexa",
-                                      #   "hey_mycroft", "hey_rhasspy") and/or absolute paths
-                                      #   to custom .onnx / .tflite files. Mixed lists allowed.
-                                      #   Example with custom Stella model:
-                                      #     models = ["/app/data/wake/hey_stella.onnx"]
+models = ["hey_stella", "stella"]     # env: STELLA_WAKE_MODELS (comma-separated)
+                                      #   Each entry is either a bundled openwakeword name
+                                      #   ("hey_jarvis", "alexa", "hey_mycroft", "hey_rhasspy")
+                                      #   or an absolute path to a custom .onnx / .tflite file.
+                                      #   Mixed lists allowed. The defaults above expect custom
+                                      #   models trained for this deployment; if you don't have
+                                      #   them, drop in the bundled fallback:
+                                      #     models = ["hey_jarvis"]
+                                      #   Custom-model example with paths:
+                                      #     models = ["/app/data/wake/hey_stella.onnx",
+                                      #               "/app/data/wake/stella.onnx"]
 threshold = 0.5                       # env: STELLA_WAKE_THRESHOLD
                                       #   0..1; lower = more sensitive (more false positives).
                                       #   Tune from [near-miss] log lines.
