@@ -57,6 +57,15 @@ step_fail() {
     echo "  [FAIL] $1"
 }
 
+# In dist mode subprocess logs are silenced; in devel they go under $LOG_DIR.
+svc_log() {
+    if [ "$BUILD_ENV" = "dist" ]; then
+        echo /dev/null
+    else
+        echo "$LOG_DIR/$1"
+    fi
+}
+
 if [ "$BUILD_ENV" = "dist" ]; then
     echo "Starting Stella..."
 fi
@@ -64,7 +73,7 @@ fi
 # ---- Start Xvfb (virtual framebuffer) ---------------------------------------
 step "Starting display server"
 rm -f /tmp/.X99-lock
-Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$LOG_DIR/xvfb.log" 2>&1 &
+Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset > "$(svc_log xvfb.log)" 2>&1 &
 export DISPLAY=:99
 sleep 2
 
@@ -84,11 +93,11 @@ dbus-daemon --system --fork 2>/dev/null || true
 
 # ---- Start PipeWire + WirePlumber -------------------------------------------
 step "Starting audio system"
-pipewire > "$LOG_DIR/pipewire.log" 2>&1 &
+pipewire > "$(svc_log pipewire.log)" 2>&1 &
 sleep 1
-wireplumber > "$LOG_DIR/wireplumber.log" 2>&1 &
+wireplumber > "$(svc_log wireplumber.log)" 2>&1 &
 sleep 1
-pipewire-pulse > "$LOG_DIR/pipewire-pulse.log" 2>&1 &
+pipewire-pulse > "$(svc_log pipewire-pulse.log)" 2>&1 &
 sleep 2
 
 # Create virtual sinks for audio routing
@@ -131,7 +140,7 @@ step_ok "Chrome ready (port $PORT)"
 # ---- Auto-login to Google account -------------------------------------------
 if [ -n "$GOOGLE_EMAIL" ] && [ -n "$GOOGLE_PASSWORD" ]; then
     step "Logging into Google account"
-    python3 << 'PYEOF' > "$LOG_DIR/google-login.log" 2>&1
+    python3 << 'PYEOF' > "$(svc_log google-login.log)" 2>&1
 import json, asyncio, websockets, urllib.request, hmac, hashlib, struct, base64, time as _time, os
 
 def totp_code(secret_b32):
@@ -296,7 +305,7 @@ PYEOF
     if [ $? -eq 0 ]; then
         step_ok "Google login complete"
     else
-        step_fail "Google login failed (see $LOG_DIR/google-login.log)"
+        step_fail "Google login failed"
     fi
 fi
 
